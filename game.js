@@ -10,7 +10,7 @@ const canvas = document.getElementById('game-canvas');
 const ctx    = canvas.getContext('2d');
 
 // 가로 20칸, 세로 20칸 격자로 게임판을 나눕니다.
-const COLS = 20, ROWS = 20;
+const COLS = 25, ROWS = 30;
 // 한 칸의 픽셀 크기 (캔버스 폭 ÷ 칸 수 = 20px)
 const CELL = canvas.width / COLS;
 

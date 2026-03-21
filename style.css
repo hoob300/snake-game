@@ -23,33 +23,26 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
-  padding: 20px 16px 24px;
+  gap: 10px;
+  padding: 8px 0 16px;
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
   width: 100%;
-  max-width: 460px;
+  max-width: 600px;
 }
 
-/* ── Header ──────────────────────────────────────────────── */
+/* ── Header (한 줄 상단 바) ──────────────────────────────── */
 header {
-  text-align: center;
   width: 100%;
+  padding: 0 12px;
 }
 
-header h1 {
-  font-size: clamp(20px, 6vw, 28px);
-  font-weight: 800;
-  letter-spacing: -0.5px;
-  background: linear-gradient(135deg, #4ade80, #22d3ee);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  margin-bottom: 12px;
-}
-
-.score-board {
+.top-bar {
   display: flex;
-  justify-content: center;
-  gap: clamp(8px, 3vw, 24px);
+  align-items: center;
+  justify-content: space-between;
+  gap: clamp(6px, 2vw, 12px);
+  width: 100%;
 }
 
 .score-item {
@@ -58,60 +51,61 @@ header h1 {
   align-items: center;
   background: rgba(255,255,255,0.06);
   border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 12px;
-  padding: clamp(8px, 2vw, 10px) clamp(12px, 3vw, 20px);
-  min-width: clamp(68px, 20vw, 80px);
+  border-radius: 10px;
+  padding: clamp(5px, 1.5vw, 8px) clamp(10px, 3vw, 16px);
+  flex: 1;
+  min-width: 0;
 }
 
 .score-item .label {
-  font-size: clamp(9px, 2.5vw, 11px);
+  font-size: clamp(8px, 2.2vw, 10px);
   color: #6b7280;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.4px;
 }
 
 .score-item .value {
-  font-size: clamp(18px, 5vw, 22px);
+  font-size: clamp(16px, 4.5vw, 20px);
   font-weight: 700;
   color: #4ade80;
-  margin-top: 2px;
+  margin-top: 1px;
 }
 
-/* ── 랭킹 버튼 ───────────────────────────────────────────── */
+/* ── 랭킹 버튼 (상단 바 안에 위치) ───────────────────────── */
 .ranking-btn {
-  margin-top: 10px;
   background: rgba(250,204,21,0.1);
   color: #facc15;
   border: 1px solid rgba(250,204,21,0.35);
   border-radius: 10px;
-  padding: 7px 20px;
-  font-size: clamp(11px, 3vw, 13px);
+  padding: clamp(8px, 2vw, 12px) clamp(10px, 3vw, 16px);
+  font-size: clamp(10px, 2.8vw, 13px);
   font-weight: 600;
   cursor: pointer;
   letter-spacing: 0.3px;
+  white-space: nowrap;
+  flex-shrink: 0;
   transition: background .15s, box-shadow .15s, transform .1s;
   -webkit-tap-highlight-color: transparent;
 }
 .ranking-btn:hover  { background: rgba(250,204,21,0.2); box-shadow: 0 0 14px rgba(250,204,21,.25); }
 .ranking-btn:active { transform: scale(0.96); }
 
-/* ── Canvas ──────────────────────────────────────────────── */
+/* ── Canvas (넓고 세로로 긴 형태) ────────────────────────── */
 .canvas-wrapper {
   position: relative;
-  border-radius: 16px;
+  border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 0 40px rgba(74,222,128,0.2), 0 0 0 2px rgba(74,222,128,0.3);
-  /* Canvas fills available width, maintains 1:1 ratio */
-  width: min(400px, calc(100vw - 32px));
-  aspect-ratio: 1 / 1;
+  box-shadow: 0 0 30px rgba(78,197,241,0.25), 0 0 0 2px rgba(78,197,241,0.3);
+  width: calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right));
+  max-width: 600px;
+  aspect-ratio: 5 / 6;
 }
 
 #game-canvas {
   display: block;
   width: 100%;
   height: 100%;
-  background: #111827;
-  /* Prevent canvas from being selected/highlighted on touch */
+  background: #4EC5F1;
   -webkit-user-select: none;
   user-select: none;
   touch-action: none;
@@ -385,10 +379,9 @@ header h1 {
 
 /* ── 초소형 화면 (360px 미만) ────────────────────────────── */
 @media (max-width: 359px) {
-  .container { padding: 12px 10px 18px; gap: 12px; }
-  .score-board { gap: 6px; }
-  .score-item { padding: 6px 8px; min-width: 60px; }
-  .dpad-btn { width: 52px; height: 52px; }
+  .container { padding: 6px 0 12px; gap: 8px; }
+  .score-item { padding: 4px 6px; }
+  .dpad-btn { width: 48px; height: 48px; }
 }
 
 /* ── 가로 모드 (landscape) ───────────────────────────────── */
@@ -404,11 +397,10 @@ header h1 {
     justify-content: center;
   }
   header { width: auto; flex: 0 0 auto; }
-  header h1 { font-size: 16px; margin-bottom: 6px; }
-  .score-item { padding: 5px 10px; min-width: 58px; }
+  .score-item { padding: 5px 10px; }
   .score-item .value { font-size: 16px; }
   .canvas-wrapper {
-    width: min(280px, calc(100vh - 80px));
+    width: min(350px, calc(100vh - 60px));
     flex: 0 0 auto;
   }
   .controls { flex: 0 0 auto; align-items: center; }

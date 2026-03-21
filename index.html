@@ -13,8 +13,7 @@
 <body>
   <div class="container">
     <header>
-      <h1>🐍 지렁이 게임</h1>
-      <div class="score-board">
+      <div class="top-bar">
         <div class="score-item">
           <span class="label">점수</span>
           <span class="value" id="score">0</span>
@@ -27,12 +26,12 @@
           <span class="label">레벨</span>
           <span class="value" id="level">1</span>
         </div>
+        <button id="ranking-btn" class="ranking-btn">🏆 랭킹</button>
       </div>
-      <button id="ranking-btn" class="ranking-btn">🏆 랭킹 보기</button>
     </header>
 
     <div class="canvas-wrapper">
-      <canvas id="game-canvas" width="400" height="400"></canvas>
+      <canvas id="game-canvas" width="500" height="600"></canvas>
       <div class="overlay" id="overlay">
         <div class="overlay-content">
           <div class="overlay-icon" id="overlay-icon">🐍</div>
