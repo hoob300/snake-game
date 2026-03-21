@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#0f0f1a" />
+  <title>🐍 지렁이 게임</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🐍 지렁이 게임</h1>
+      <div class="score-board">
+        <div class="score-item">
+          <span class="label">점수</span>
+          <span class="value" id="score">0</span>
+        </div>
+        <div class="score-item">
+          <span class="label">최고점수</span>
+          <span class="value" id="best-score">0</span>
+        </div>
+        <div class="score-item">
+          <span class="label">레벨</span>
+          <span class="value" id="level">1</span>
+        </div>
+      </div>
+      <button id="ranking-btn" class="ranking-btn">🏆 랭킹 보기</button>
+    </header>
+
+    <div class="canvas-wrapper">
+      <canvas id="game-canvas" width="400" height="400"></canvas>
+      <div class="overlay" id="overlay">
+        <div class="overlay-content">
+          <div class="overlay-icon" id="overlay-icon">🐍</div>
+          <h2 id="overlay-title">지렁이 게임</h2>
+          <p id="overlay-msg">방향키·WASD 또는 화면 스와이프로 이동</p>
+
+          <div id="name-section" class="name-section hidden">
+            <p class="name-label">🎖 기록을 남기세요</p>
+            <div class="name-row">
+              <input type="text" id="player-name" class="name-input"
+                maxlength="10" placeholder="닉네임 (최대 10자)"
+                autocomplete="off" spellcheck="false" enterkeyhint="done" />
+              <button id="save-btn" class="save-btn">저장</button>
+            </div>
+            <button id="skip-btn" class="skip-btn">건너뛰기</button>
+          </div>
+
+          <button id="start-btn">시작하기</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 모바일 D-패드 -->
+    <div class="controls">
+      <div class="dpad">
+        <button class="dpad-btn" id="btn-up" aria-label="위">▲</button>
+        <div class="dpad-row">
+          <button class="dpad-btn" id="btn-left" aria-label="왼쪽">◀</button>
+          <button class="dpad-btn center" id="btn-pause" aria-label="일시정지">⏸</button>
+          <button class="dpad-btn" id="btn-right" aria-label="오른쪽">▶</button>
+        </div>
+        <button class="dpad-btn" id="btn-down" aria-label="아래">▼</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 랭킹 모달 -->
+  <div id="ranking-modal" class="ranking-modal hidden">
+    <div class="ranking-panel">
+      <div class="ranking-header">
+        <div class="ranking-title">
+          <span class="trophy">🏆</span>
+          <h2>명예의 전당</h2>
+        </div>
+        <button id="close-ranking" class="close-btn">✕</button>
+      </div>
+      <div id="ranking-list" class="ranking-list"></div>
+      <p class="ranking-footer">최대 10위까지 기록됩니다</p>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="game.js"></script>
+</body>
+</html>
