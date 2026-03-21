@@ -54,7 +54,7 @@
       </div>
     </div>
 
-    <!-- 모바일 D-패드 -->
+    <!-- 모바일 D-패드 + 아이템 버튼 -->
     <div class="controls">
       <div class="dpad">
         <button class="dpad-btn" id="btn-up" aria-label="위">▲</button>
@@ -64,6 +64,18 @@
           <button class="dpad-btn" id="btn-right" aria-label="오른쪽">▶</button>
         </div>
         <button class="dpad-btn" id="btn-down" aria-label="아래">▼</button>
+      </div>
+      <!-- 아이템 사용 버튼 + 인벤토리 슬롯 표시 -->
+      <div class="item-panel">
+        <button class="dpad-btn item-btn" id="btn-item" aria-label="아이템 사용">🎒</button>
+        <div class="inventory-slots" id="inventory-slots">
+          <span class="inv-slot empty">·</span>
+          <span class="inv-slot empty">·</span>
+          <span class="inv-slot empty">·</span>
+          <span class="inv-slot empty">·</span>
+          <span class="inv-slot empty">·</span>
+        </div>
+        <span class="item-hint">Q키</span>
       </div>
     </div>
   </div>

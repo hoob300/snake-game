@@ -53,6 +53,21 @@ let enemies, bossEnemies, fireballs, pendingEffects, tickCount, toasts;
 // 마지막 틱이 실행된 시각 / 현재 틱 진행도 (0~1, 부드러운 보간에 사용)
 let lastTickTime = 0, tickProgress = 0, rAFId = null;
 
+// ── 아이템 시스템 변수 ────────────────────────────────────────
+// fieldItems: 맵에 놓인 아이템 배열 [{x, y, type}]
+// inventory: 뱀이 먹은 아이템 대기열 (FIFO, 먹은 순서대로 사용)
+// frozenTimer: 적 동결 남은 틱 수 (0이면 비활성)
+// invincibleTimer: 뱀 무적 남은 틱 수 (0이면 비활성)
+// itemSpawnCounter: 아이템 스폰 간격 카운터 (틱)
+let fieldItems, inventory, frozenTimer, invincibleTimer, itemSpawnCounter;
+
+// 아이템 종류 3가지 정의
+// freeze: ⏱️ 적 3초 동결, kill: 💀 랜덤 적 1마리 삭제, invincible: 🛡️ 5초 무적
+const ITEM_TYPES = ['freeze', 'kill', 'invincible'];
+const ITEM_ICONS = { freeze: '⏱️', kill: '💀', invincible: '🛡️' };
+const ITEM_COLORS = { freeze: '#60A5FA', kill: '#F87171', invincible: '#FBBF24' };
+const ITEM_NAMES = { freeze: '동결', kill: '처치', invincible: '무적' };
+
 // ── 보스 얼굴 이미지 ────────────────────────────────────────
 // snake 폴더 안의 tae.jpg 파일을 불러옵니다.
 // 파일이 없으면 자동으로 기본 얼굴이 그려집니다.
@@ -95,6 +110,13 @@ function init() {
   pendingEffects = [];
   tickCount   = 0;
   toasts      = [];
+  // 아이템 시스템 초기화
+  fieldItems       = [];    // 맵 위의 아이템 제거
+  inventory        = [];    // 인벤토리 비우기
+  frozenTimer      = 0;     // 동결 해제
+  invincibleTimer  = 0;     // 무적 해제
+  itemSpawnCounter = 0;     // 스폰 카운터 초기화
+  updateInventoryUI();      // 인벤토리 UI 업데이트
 
   // 화면 UI 초기화
   scoreEl.textContent = 0;
@@ -348,8 +370,8 @@ function tickEffects() {
     }
 
     if (eff.type === 'lightning_strike') {
-      // 번개 칸에 뱀 머리가 있으면 게임 오버
-      if (eff.cells.some(c => c.x===snake[0].x && c.y===snake[0].y)) {
+      // 번개 칸에 뱀 머리가 있으면 게임 오버 (무적이면 무시)
+      if (invincibleTimer <= 0 && eff.cells.some(c => c.x===snake[0].x && c.y===snake[0].y)) {
         gameOver(); return false;
       }
       return eff.timer > 0; // 타이머가 남아 있으면 유지
@@ -372,8 +394,8 @@ function tickEffects() {
     }
 
     if (eff.type === 'bomb_burn') {
-      // 불타는 칸에 뱀 머리가 있으면 게임 오버
-      if (eff.cells.some(c => c.x===snake[0].x && c.y===snake[0].y)) {
+      // 불타는 칸에 뱀 머리가 있으면 게임 오버 (무적이면 무시)
+      if (invincibleTimer <= 0 && eff.cells.some(c => c.x===snake[0].x && c.y===snake[0].y)) {
         gameOver(); return false;
       }
       return eff.timer > 0;
@@ -512,14 +534,14 @@ function tick() {
     head.x = nh.x; head.y = nh.y;
   }
 
-  // 자기 몸통에 부딪히면 게임 오버
+  // 자기 몸통에 부딪히면 게임 오버 (무적이어도 자기 몸은 피해야 함)
   if (onSnake(head)) return gameOver();
 
   // 머리를 맨 앞에 추가 (뱀이 한 칸 앞으로 이동)
   snake.unshift(head);
 
-  // 이동 후 충돌 확인 (몹·보스·불덩이)
-  if (checkCollision(head)) return gameOver();
+  // 이동 후 충돌 확인 (몹·보스·불덩이) — 무적 상태면 무시
+  if (invincibleTimer <= 0 && checkCollision(head)) return gameOver();
 
   // 먹이 처리
   let ate=false;
@@ -538,16 +560,46 @@ function tick() {
   // 보너스 먹이 타이머 감소
   if (bonusFood) { bonusFood.timer--; if (bonusFood.timer<=0) bonusFood=null; }
 
+  // ── 아이템 스폰 (약 10초마다) ──
+  itemSpawnCounter++;
+  const spawnInterval = Math.round(10000 / speed); // 10초를 틱 수로 변환
+  if (itemSpawnCounter >= spawnInterval) {
+    itemSpawnCounter = 0;
+    spawnFieldItem(); // 맵에 아이템 하나 생성
+  }
+
+  // ── 아이템 줍기 (뱀 머리가 아이템 위에 도착하면) ──
+  const head2 = snake[0];
+  fieldItems = fieldItems.filter(item => {
+    if (item.x === head2.x && item.y === head2.y) {
+      // 인벤토리에 추가 (최대 5개까지)
+      if (inventory.length < 5) {
+        inventory.push(item.type);
+        updateInventoryUI();
+        addToast(`${ITEM_ICONS[item.type]} ${ITEM_NAMES[item.type]} 획득!`, ITEM_COLORS[item.type], 1.2);
+      }
+      return false; // 맵에서 제거
+    }
+    return true;
+  });
+
+  // ── 동결/무적 타이머 감소 ──
+  if (frozenTimer > 0) frozenTimer--;
+  if (invincibleTimer > 0) invincibleTimer--;
+
   // 몹·보스·불덩이 이동 및 이펙트 처리
-  moveEnemies();
+  // 동결 중이면 적 이동과 보스 스킬을 멈춥니다
+  if (frozenTimer <= 0) {
+    moveEnemies();
+    moveBosses();
+    moveFireballs();
+  }
   // 몹이 뱀의 몸통(꼬리)에 닿으면 그 몹은 사라집니다.
   enemies = enemies.filter(e => !snake.slice(1).some(s=>s.x===e.x&&s.y===e.y));
-  moveBosses();
-  moveFireballs();
   tickEffects();
 
-  // 이동 후 다시 한 번 충돌 확인 (불덩이가 이동해서 뱀과 겹칠 수 있음)
-  if (checkCollision(snake[0])) return gameOver();
+  // 이동 후 다시 한 번 충돌 확인 (불덩이가 이동해서 뱀과 겹칠 수 있음) — 무적이면 무시
+  if (invincibleTimer <= 0 && checkCollision(snake[0])) return gameOver();
 
   // 먹이를 먹었을 때만 점수와 레벨을 업데이트합니다.
   if (ate) { scoreEl.textContent=score; updateLevel(); }
@@ -633,7 +685,10 @@ function draw() {
   drawFireballs();       // 불덩이
   drawEnemies();         // 일반 몹
   drawBosses();          // 보스 태이
+  drawFieldItems();      // 맵 위 아이템
   drawSnake();           // 뱀
+  drawInvincibleShield(); // 무적 쉴드 효과
+  drawFreezeOverlay();   // 동결 서리 효과
   tickToasts();          // 토스트 위치·투명도 업데이트
   drawToasts();          // 토스트 그리기
 }
@@ -686,43 +741,43 @@ function drawSnake() {
     y: s.y * CELL + CELL / 2,
   }));
 
-  // ── 몸통 두께: 머리(굵음) → 꼬리(가늘어짐) ──
-  const W = CELL * 0.82;          // 머리 쪽 최대 두께
-  const tailW = CELL * 0.35;      // 꼬리 끝 최소 두께
+  // ── 몸통 두께: 전체 동일, 꼬리 1칸만 줄어듬 ──
+  const W = CELL * 0.82;          // 몸통 균일 두께
+  const tailW = CELL * 0.38;      // 꼬리 끝 두께
 
-  // 각 마디에서의 두께를 미리 계산합니다
+  // 꼬리 마지막 1마디만 두께가 줄어듭니다
   function widthAt(i) {
-    const t = i / (pts.length - 1 || 1); // 0(머리)~1(꼬리)
-    return W - (W - tailW) * t;
+    if (pts.length <= 1) return W;
+    if (i === pts.length - 1) return tailW;           // 꼬리 끝
+    if (i === pts.length - 2) return (W + tailW) / 2; // 꼬리 직전 (부드러운 전환)
+    return W; // 나머지 몸통은 동일 두께
   }
 
-  // ── 1단계: 그림자 (부드러운 검정 반투명) ──
+  // ── 뱀 색상: 진한 초록 기반 ──
+  // 실제 뱀처럼 진한 에메랄드 그린 → 올리브 그린
+  const SNAKE_MAIN   = '#2D8B4E'; // 메인 몸통 초록
+  const SNAKE_DARK   = '#1A5C32'; // 어두운 테두리/비늘 색
+  const SNAKE_SCALE  = '#1E6B3A'; // 다이아몬드 무늬 색
+  const SNAKE_HEAD   = '#34A853'; // 머리 밝은 초록
+
+  // ── 1단계: 그림자 ──
   ctx.save();
-  ctx.globalAlpha = 0.18;
+  ctx.globalAlpha = 0.2;
   ctx.lineWidth = W + 4;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   ctx.strokeStyle = '#000';
   ctx.beginPath();
   ctx.moveTo(pts[0].x + 3, pts[0].y + 4);
-  for (let i = 1; i < pts.length; i++) {
-    ctx.lineTo(pts[i].x + 3, pts[i].y + 4);
-  }
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x + 3, pts[i].y + 4);
   ctx.stroke();
   ctx.restore();
 
-  // ── 2단계: 메인 몸통 (끊김 없는 두꺼운 주황색 라인) ──
-  // 세그먼트마다 폭이 다르므로 구간별로 그립니다
+  // ── 2단계: 메인 몸통 (균일 두께 초록 라인) ──
   for (let i = pts.length - 2; i >= 0; i--) {
     const a = pts[i + 1], b = pts[i];
-    const w = (widthAt(i) + widthAt(i + 1)) / 2; // 두 마디 평균 두께
-
-    // 주황 그라데이션: 머리(밝은 노랑) → 꼬리(진한 주황)
-    const g = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
-    g.addColorStop(0, bodyColor(i + 1, pts.length));
-    g.addColorStop(1, bodyColor(i, pts.length));
-
-    ctx.strokeStyle = g;
+    const w = (widthAt(i) + widthAt(i + 1)) / 2;
+    ctx.strokeStyle = SNAKE_MAIN;
     ctx.lineWidth = w;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -732,143 +787,240 @@ function drawSnake() {
     ctx.stroke();
   }
 
-  // ── 3단계: 하이라이트 줄 (몸통 중앙을 따라 밝은 노란 띠) ──
+  // ── 3단계: 배(아랫면) 밝은 줄 (뱀의 복부 표현) ──
   ctx.save();
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   for (let i = pts.length - 2; i >= 0; i--) {
     const a = pts[i + 1], b = pts[i];
-    const w = widthAt(i) * 0.35; // 하이라이트는 몸통의 35% 두께
-    ctx.strokeStyle = 'rgba(255,230,140,0.45)';
+    const w = widthAt(i) * 0.32;
+    ctx.strokeStyle = 'rgba(92,214,133,0.4)';
     ctx.lineWidth = w;
-    // 약간 위쪽으로 오프셋 (빛 반사 표현)
     ctx.beginPath();
-    ctx.moveTo(a.x - 1, a.y - 2);
-    ctx.lineTo(b.x - 1, b.y - 2);
+    ctx.moveTo(a.x - 1, a.y - 1);
+    ctx.lineTo(b.x - 1, b.y - 1);
     ctx.stroke();
   }
   ctx.restore();
 
-  // ── 4단계: 가장자리 어두운 테두리 (양쪽 경계선) ──
-  // 위아래 오프셋으로 어두운 경계를 그려 입체감을 강화합니다
+  // ── 4단계: 다이아몬드 비늘 무늬 ──
+  // 실제 뱀처럼 몸통을 따라 마름모(◆) 무늬를 그립니다
+  for (let i = 1; i < pts.length - 1; i++) {
+    // 매 2마디마다 다이아몬드 패턴 (짝수 인덱스에만)
+    if (i % 2 !== 0) continue;
+    const p = pts[i];
+    // 이동 방향 계산 (이전→다음 마디 방향)
+    const prev = pts[i - 1], next = pts[i + 1];
+    const dx = next.x - prev.x, dy = next.y - prev.y;
+    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+    const fwd = { x: dx / len, y: dy / len };     // 진행 방향 단위 벡터
+    const prp = { x: -fwd.y, y: fwd.x };          // 수직 방향 단위 벡터
+    const sz = widthAt(i) * 0.32; // 다이아몬드 크기
+
+    // 마름모 4꼭짓점: 위(진행방향), 오른쪽, 아래, 왼쪽
+    ctx.fillStyle = SNAKE_SCALE;
+    ctx.globalAlpha = 0.55;
+    ctx.beginPath();
+    ctx.moveTo(p.x + fwd.x * sz,  p.y + fwd.y * sz);   // 위
+    ctx.lineTo(p.x + prp.x * sz * 0.7, p.y + prp.y * sz * 0.7); // 오른쪽
+    ctx.lineTo(p.x - fwd.x * sz,  p.y - fwd.y * sz);   // 아래
+    ctx.lineTo(p.x - prp.x * sz * 0.7, p.y - prp.y * sz * 0.7); // 왼쪽
+    ctx.closePath();
+    ctx.fill();
+
+    // 다이아몬드 안에 밝은 점 (비늘 반짝임)
+    ctx.fillStyle = '#A8E6C0';
+    ctx.globalAlpha = 0.35;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, sz * 0.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  // ── 5단계: 가장자리 어두운 테두리 (양쪽 경계선) ──
   for (let i = pts.length - 2; i >= 0; i--) {
     const a = pts[i + 1], b = pts[i];
     const w = (widthAt(i) + widthAt(i + 1)) / 2;
-
-    // 이동 방향에 수직인 방향 계산
     const dx = b.x - a.x, dy = b.y - a.y;
     const len = Math.sqrt(dx * dx + dy * dy) || 1;
-    const nx = -dy / len, ny = dx / len; // 수직 벡터
+    const nx = -dy / len, ny = dx / len;
 
-    ctx.strokeStyle = 'rgba(180,80,0,0.3)';
-    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = 'rgba(26,92,50,0.45)';
+    ctx.lineWidth = 1.8;
     ctx.lineCap = 'round';
     // 위쪽 가장자리
     ctx.beginPath();
-    ctx.moveTo(a.x + nx * w * 0.45, a.y + ny * w * 0.45);
-    ctx.lineTo(b.x + nx * w * 0.45, b.y + ny * w * 0.45);
+    ctx.moveTo(a.x + nx * w * 0.46, a.y + ny * w * 0.46);
+    ctx.lineTo(b.x + nx * w * 0.46, b.y + ny * w * 0.46);
     ctx.stroke();
     // 아래쪽 가장자리
     ctx.beginPath();
-    ctx.moveTo(a.x - nx * w * 0.45, a.y - ny * w * 0.45);
-    ctx.lineTo(b.x - nx * w * 0.45, b.y - ny * w * 0.45);
+    ctx.moveTo(a.x - nx * w * 0.46, a.y - ny * w * 0.46);
+    ctx.lineTo(b.x - nx * w * 0.46, b.y - ny * w * 0.46);
     ctx.stroke();
   }
 
-  // ── 5단계: 머리 그리기 ──
+  // ── 6단계: 옆면 비늘 줄무늬 (뱀 옆구리 표현) ──
+  // 몸통 양쪽 가장자리를 따라 짧은 수직 줄을 그려 비늘 질감을 표현합니다
+  for (let i = 1; i < pts.length - 1; i++) {
+    if (i % 3 !== 0) continue; // 3마디마다
+    const p = pts[i];
+    const prev = pts[i - 1], next = pts[Math.min(i + 1, pts.length - 1)];
+    const dx = next.x - prev.x, dy = next.y - prev.y;
+    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+    const prp = { x: dy / len, y: -dx / len };
+    const w = widthAt(i) * 0.46;
+
+    ctx.strokeStyle = 'rgba(26,92,50,0.25)';
+    ctx.lineWidth = 1;
+    // 왼쪽 비늘 줄
+    ctx.beginPath();
+    ctx.moveTo(p.x + prp.x * w * 0.6, p.y + prp.y * w * 0.6);
+    ctx.lineTo(p.x + prp.x * w, p.y + prp.y * w);
+    ctx.stroke();
+    // 오른쪽 비늘 줄
+    ctx.beginPath();
+    ctx.moveTo(p.x - prp.x * w * 0.6, p.y - prp.y * w * 0.6);
+    ctx.lineTo(p.x - prp.x * w, p.y - prp.y * w);
+    ctx.stroke();
+  }
+
+  // ── 7단계: 머리 그리기 (삼각형에 가까운 뱀 머리) ──
   const h = pts[0];
   const hx = h.x, hy = h.y;
-  const R = CELL * 0.55; // 머리 반지름 (몸통보다 약간 큼)
-  const ed = dir;                    // 이동 방향 벡터
-  const perp = { x: -ed.y, y: ed.x }; // 수직 방향 벡터
+  const R = CELL * 0.55;
+  const ed = dir;
+  const perp = { x: -ed.y, y: ed.x };
 
-  // 머리 본체 (주황색 3D 구체)
-  const hGrd = ctx.createRadialGradient(hx - 3, hy - 3, 1, hx, hy, R);
-  hGrd.addColorStop(0, '#FFD966');   // 밝은 노란 하이라이트
-  hGrd.addColorStop(0.4, '#F5A623'); // 밝은 주황
-  hGrd.addColorStop(1, '#D4780A');   // 진한 주황 테두리
+  // 머리 본체 (진한 초록 3D 구체, 약간 앞으로 납작한 타원)
+  ctx.save();
+  const headW = R * 1.1; // 좌우 폭
+  const headH = R * 0.9; // 앞뒤 높이
+
+  // 머리 그라데이션 (밝은 초록 → 진한 초록)
+  const hGrd = ctx.createRadialGradient(
+    hx - perp.x * 2 - ed.x * 2, hy - perp.y * 2 - ed.y * 2, 1,
+    hx, hy, R
+  );
+  hGrd.addColorStop(0, '#5CD685');   // 밝은 초록 하이라이트
+  hGrd.addColorStop(0.4, SNAKE_HEAD); // 메인 초록
+  hGrd.addColorStop(1, SNAKE_DARK);   // 진한 테두리
   ctx.fillStyle = hGrd;
-  ctx.beginPath(); ctx.arc(hx, hy, R, 0, Math.PI * 2); ctx.fill();
 
-  // 머리 상단 하이라이트 (큰 빛 반사)
-  ctx.fillStyle = 'rgba(255,255,255,0.45)';
+  // 타원형 머리 (이동 방향으로 약간 납작)
   ctx.beginPath();
-  ctx.ellipse(hx - 2, hy - 3, R * 0.45, R * 0.25, -0.4, 0, Math.PI * 2);
+  const headAngle = Math.atan2(ed.y, ed.x);
+  ctx.ellipse(hx + ed.x * 2, hy + ed.y * 2, headW, headH, headAngle, 0, Math.PI * 2);
   ctx.fill();
 
-  // 눈 2개 (큰 동그란 눈)
-  const fwd = 3;
-  const e1 = { x: hx + ed.x * fwd + perp.x * 3.5, y: hy + ed.y * fwd + perp.y * 3.5 };
-  const e2 = { x: hx + ed.x * fwd - perp.x * 3.5, y: hy + ed.y * fwd - perp.y * 3.5 };
+  // 머리 위 비늘 패턴 (V자 형태)
+  ctx.strokeStyle = 'rgba(26,92,50,0.4)';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(hx + perp.x * 4, hy + perp.y * 4);
+  ctx.lineTo(hx - ed.x * 3, hy - ed.y * 3);
+  ctx.lineTo(hx - perp.x * 4, hy - perp.y * 4);
+  ctx.stroke();
+
+  // 머리 상단 하이라이트 (빛 반사)
+  ctx.fillStyle = 'rgba(160,230,180,0.35)';
+  ctx.beginPath();
+  ctx.ellipse(hx - ed.x * 1 - perp.x * 1, hy - ed.y * 1 - perp.y * 1,
+    R * 0.35, R * 0.18, headAngle - 0.3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // 눈 2개 (세로로 긴 동공 — 실제 뱀의 슬릿 동공)
+  const fwd = 4;
+  const eyeSpread = 4.0;
+  const e1 = { x: hx + ed.x * fwd + perp.x * eyeSpread, y: hy + ed.y * fwd + perp.y * eyeSpread };
+  const e2 = { x: hx + ed.x * fwd - perp.x * eyeSpread, y: hy + ed.y * fwd - perp.y * eyeSpread };
+  const eyeAngle = Math.atan2(ed.y, ed.x); // 동공 각도 (이동 방향 기준)
+
   [e1, e2].forEach(e => {
-    // 흰자
-    ctx.fillStyle = '#fff';
-    ctx.beginPath(); ctx.arc(e.x, e.y, 4.0, 0, Math.PI * 2); ctx.fill();
-    // 검은 동공
-    ctx.fillStyle = '#1a1a1a';
-    ctx.beginPath(); ctx.arc(e.x + ed.x * 0.8, e.y + ed.y * 0.8, 2.4, 0, Math.PI * 2); ctx.fill();
-    // 큰 반짝임
-    ctx.fillStyle = '#fff';
-    ctx.beginPath(); ctx.arc(e.x - 0.6, e.y - 0.8, 1.1, 0, Math.PI * 2); ctx.fill();
-    // 작은 반짝임
-    ctx.beginPath(); ctx.arc(e.x + 1.2, e.y + 0.8, 0.4, 0, Math.PI * 2); ctx.fill();
-  });
-
-  // 볼터치 (양 볼에 핑크 블러시)
-  [1, -1].forEach(s => {
-    const bx = hx + perp.x * 5.8 * s - ed.x * 1;
-    const by = hy + perp.y * 5.8 * s - ed.y * 1;
-    ctx.fillStyle = 'rgba(255,160,120,0.45)';
+    // 노란 홍채 (뱀의 특징적인 노란 눈)
+    ctx.fillStyle = '#E8D44D';
+    ctx.beginPath(); ctx.arc(e.x, e.y, 3.5, 0, Math.PI * 2); ctx.fill();
+    // 어두운 테두리
+    ctx.strokeStyle = '#2D5A1E';
+    ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.arc(e.x, e.y, 3.5, 0, Math.PI * 2); ctx.stroke();
+    // 세로 슬릿 동공 (뱀 특유의 세로 눈)
+    ctx.fillStyle = '#111';
     ctx.beginPath();
-    ctx.ellipse(bx, by, 3.2, 1.8, Math.atan2(perp.y, perp.x), 0, Math.PI * 2);
+    ctx.ellipse(e.x + ed.x * 0.3, e.y + ed.y * 0.3,
+      0.9, 2.8, eyeAngle + Math.PI / 2, 0, Math.PI * 2);
     ctx.fill();
+    // 작은 반짝임
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(e.x - 0.8, e.y - 1.0, 0.9, 0, Math.PI * 2); ctx.fill();
   });
 
-  // 혀 내밀기 (주기적으로 빨간 혀)
+  // 콧구멍 2개 (머리 앞쪽에 작은 구멍)
+  const noseD = R * 0.7;
+  const n1 = { x: hx + ed.x * noseD + perp.x * 2, y: hy + ed.y * noseD + perp.y * 2 };
+  const n2 = { x: hx + ed.x * noseD - perp.x * 2, y: hy + ed.y * noseD - perp.y * 2 };
+  ctx.fillStyle = '#1A4D2E';
+  [n1, n2].forEach(n => {
+    ctx.beginPath(); ctx.arc(n.x, n.y, 1.2, 0, Math.PI * 2); ctx.fill();
+  });
+
+  // 혀 내밀기 (주기적으로 빨간 갈라진 혀)
   if (Math.floor(tickCount / 10) % 4 === 0) {
-    const tx = hx + ed.x * R, ty = hy + ed.y * R;
-    ctx.strokeStyle = '#E74C3C';
+    const tx = hx + ed.x * (R + 2), ty = hy + ed.y * (R + 2);
+    ctx.strokeStyle = '#DC2626';
     ctx.lineWidth = 1.5;
     ctx.lineCap = 'round';
+    // 혀 줄기
     ctx.beginPath();
     ctx.moveTo(tx, ty);
-    ctx.lineTo(tx + ed.x * 5, ty + ed.y * 5);
+    ctx.lineTo(tx + ed.x * 6, ty + ed.y * 6);
     ctx.stroke();
-    // 갈라진 혀 끝
+    // 갈라진 혀 끝 (Y자 형태)
+    ctx.lineWidth = 1.2;
     ctx.beginPath();
-    ctx.moveTo(tx + ed.x * 5, ty + ed.y * 5);
-    ctx.lineTo(tx + ed.x * 5 + perp.x * 2, ty + ed.y * 5 + perp.y * 2);
-    ctx.moveTo(tx + ed.x * 5, ty + ed.y * 5);
-    ctx.lineTo(tx + ed.x * 5 - perp.x * 2, ty + ed.y * 5 - perp.y * 2);
+    ctx.moveTo(tx + ed.x * 6, ty + ed.y * 6);
+    ctx.lineTo(tx + ed.x * 8 + perp.x * 2.5, ty + ed.y * 8 + perp.y * 2.5);
+    ctx.moveTo(tx + ed.x * 6, ty + ed.y * 6);
+    ctx.lineTo(tx + ed.x * 8 - perp.x * 2.5, ty + ed.y * 8 - perp.y * 2.5);
     ctx.stroke();
   }
 
-  // ── 6단계: 꼬리 끝 둥글게 마무리 ──
+  // ── 8단계: 꼬리 끝 (마지막 1칸만 뾰족하게 둥글림) ──
   if (pts.length > 1) {
     const tail = pts[pts.length - 1];
+    const prev = pts[pts.length - 2];
+    // 꼬리 방향 계산
+    const tdx = tail.x - prev.x, tdy = tail.y - prev.y;
+    const tLen = Math.sqrt(tdx * tdx + tdy * tdy) || 1;
+    const tDir = { x: tdx / tLen, y: tdy / tLen };
+
+    // 둥근 끝 (초록 그라데이션)
     const tR = tailW * 0.5;
-    const tGrd = ctx.createRadialGradient(tail.x - 1, tail.y - 1, 0, tail.x, tail.y, tR);
-    tGrd.addColorStop(0, '#E8963A');
-    tGrd.addColorStop(1, '#C06A1A');
+    const tipX = tail.x + tDir.x * tR * 0.3; // 약간 끝 방향으로 이동
+    const tipY = tail.y + tDir.y * tR * 0.3;
+    const tGrd = ctx.createRadialGradient(tipX - 1, tipY - 1, 0, tipX, tipY, tR);
+    tGrd.addColorStop(0, SNAKE_MAIN);
+    tGrd.addColorStop(1, SNAKE_DARK);
     ctx.fillStyle = tGrd;
-    ctx.beginPath(); ctx.arc(tail.x, tail.y, tR, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(tipX, tipY, tR, 0, Math.PI * 2); ctx.fill();
   }
 }
 
-// 뱀 몸통 색상: 밝은 주황 → 진한 주황 (머리쪽 밝고 꼬리쪽 어두움)
+// 뱀 몸통 색상 (비늘 패턴에 사용 — 초록 계열)
 function bodyColor(i, len) {
-  const t = i / (len - 1 || 1); // 0(머리) ~ 1(꼬리)
-  const r = Math.round(245 - t * 50);  // 245→195
-  const g = Math.round(166 - t * 70);  // 166→96
-  const b = Math.round(35 - t * 15);   // 35→20
+  const t = i / (len - 1 || 1);
+  const r = Math.round(45 - t * 10);   // 45→35
+  const g = Math.round(139 - t * 30);  // 139→109
+  const b = Math.round(78 - t * 15);   // 78→63
   return `rgb(${r},${g},${b})`;
 }
-// 빛 받는 면의 밝은 색상 (하이라이트용)
+// 밝은 색상 (하이라이트용)
 function bodyColorLight(i, len) {
   const t = i / (len - 1 || 1);
-  const r = Math.round(255 - t * 30);
-  const g = Math.round(210 - t * 60);
-  const b = Math.round(80 - t * 30);
+  const r = Math.round(92 - t * 20);
+  const g = Math.round(214 - t * 40);
+  const b = Math.round(133 - t * 25);
   return `rgb(${r},${g},${b})`;
 }
 
@@ -1380,6 +1532,153 @@ function roundRect(ctx,x,y,w,h,r) {
   ctx.closePath();
 }
 
+// ── 아이템 스폰 함수 ─────────────────────────────────────────
+// 맵에 랜덤 위치에 랜덤 아이템을 하나 생성합니다.
+// 최대 3개까지만 맵에 동시에 존재합니다.
+function spawnFieldItem() {
+  if (fieldItems.length >= 3) return; // 맵에 이미 3개 있으면 추가 안 함
+  let p, att = 0;
+  do { p = randomCell(); att++; }
+  while (att < 200 && (
+    onSnake(p) || onEnemy(p, null) || onBoss(p, null) ||
+    (p.x === food.x && p.y === food.y) ||
+    fieldItems.some(it => it.x === p.x && it.y === p.y)
+  ));
+  // 3가지 중 랜덤 선택
+  const type = ITEM_TYPES[Math.floor(Math.random() * ITEM_TYPES.length)];
+  fieldItems.push({ x: p.x, y: p.y, type });
+}
+
+// ── 아이템 사용 함수 ─────────────────────────────────────────
+// 인벤토리에서 가장 먼저 주운 아이템을 꺼내 사용합니다. (FIFO)
+function useItem() {
+  if (!running || paused || inventory.length === 0) return;
+  const type = inventory.shift(); // 가장 오래된 아이템 꺼내기
+  updateInventoryUI();
+
+  if (type === 'freeze') {
+    // ⏱️ 동결: 3초 동안 모든 적과 보스가 멈춤 (보스 스킬 포함)
+    frozenTimer = Math.round(3000 / speed);
+    addToast('⏱️ 적 동결! 3초', '#60A5FA', 1.5);
+  } else if (type === 'kill') {
+    // 💀 처치: 랜덤 적 1마리 삭제 (보스 우선, 없으면 일반 몹)
+    if (bossEnemies.length > 0) {
+      const idx = Math.floor(Math.random() * bossEnemies.length);
+      const removed = bossEnemies.splice(idx, 1)[0];
+      addToast(`💀 ${BOSS_STYLE[removed.skillType].label} 처치!`, '#F87171', 1.5);
+    } else if (enemies.length > 0) {
+      const idx = Math.floor(Math.random() * enemies.length);
+      enemies.splice(idx, 1);
+      addToast('💀 적 처치!', '#F87171', 1.5);
+    } else {
+      addToast('💀 적이 없습니다', '#888', 1.2);
+    }
+  } else if (type === 'invincible') {
+    // 🛡️ 무적: 5초 동안 적·불·번개·폭탄에 안 죽음
+    invincibleTimer = Math.round(5000 / speed);
+    addToast('🛡️ 무적! 5초', '#FBBF24', 1.5);
+  }
+}
+
+// ── 인벤토리 UI 업데이트 ─────────────────────────────────────
+// HTML의 인벤토리 슬롯과 아이템 버튼 상태를 갱신합니다.
+function updateInventoryUI() {
+  const slots = document.getElementById('inventory-slots');
+  const itemBtn = document.getElementById('btn-item');
+  if (!slots || !itemBtn) return;
+
+  // 인벤토리 슬롯 5개를 그리기
+  let html = '';
+  for (let i = 0; i < 5; i++) {
+    if (i < inventory.length) {
+      const t = inventory[i];
+      html += `<span class="inv-slot filled" style="border-color:${ITEM_COLORS[t]}">${ITEM_ICONS[t]}</span>`;
+    } else {
+      html += `<span class="inv-slot empty">·</span>`;
+    }
+  }
+  slots.innerHTML = html;
+
+  // 아이템이 있으면 버튼 활성화 표시
+  if (inventory.length > 0) {
+    itemBtn.classList.add('has-item');
+    itemBtn.textContent = `${ITEM_ICONS[inventory[0]]}`;
+  } else {
+    itemBtn.classList.remove('has-item');
+    itemBtn.textContent = '🎒';
+  }
+}
+
+// ── 맵 위 아이템 그리기 ──────────────────────────────────────
+// 필드에 놓인 아이템을 반짝이는 원형으로 그립니다.
+function drawFieldItems() {
+  const now = performance.now();
+  fieldItems.forEach(item => {
+    const x = item.x * CELL, y = item.y * CELL;
+    const cx = x + CELL / 2, cy = y + CELL / 2;
+    const pulse = 0.8 + 0.2 * Math.sin(now / 300 + item.x + item.y); // 맥동
+    const R = CELL * 0.42 * pulse;
+    const color = ITEM_COLORS[item.type];
+
+    // 글로우 효과
+    const grd = ctx.createRadialGradient(cx, cy, 1, cx, cy, CELL * 0.9);
+    grd.addColorStop(0, color.replace(')', ',0.4)').replace('rgb', 'rgba'));
+    grd.addColorStop(1, 'transparent');
+    ctx.fillStyle = grd;
+    ctx.fillRect(x - CELL * 0.3, y - CELL * 0.3, CELL * 1.6, CELL * 1.6);
+
+    // 아이템 배경 원
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.85;
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // 아이콘 텍스트
+    ctx.font = `${Math.round(CELL * 0.65)}px sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(ITEM_ICONS[item.type], cx, cy + 1);
+  });
+}
+
+// ── 무적 효과 시각화 ─────────────────────────────────────────
+// 무적 상태일 때 뱀 주변에 황금 빛 쉴드를 그립니다.
+function drawInvincibleShield() {
+  if (invincibleTimer <= 0) return;
+  const interp = getInterp();
+  if (interp.length === 0) return;
+  const h = interp[0];
+  const cx = h.x * CELL + CELL / 2, cy = h.y * CELL + CELL / 2;
+  const now = performance.now();
+  const pulse = 0.6 + 0.3 * Math.sin(now / 200);
+  const R = CELL * 1.2;
+
+  ctx.save();
+  ctx.globalAlpha = pulse * 0.5;
+  ctx.strokeStyle = '#FBBF24';
+  ctx.lineWidth = 3;
+  ctx.setLineDash([6, 4]);
+  ctx.lineDashOffset = -now / 100;
+  ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // 안쪽 빛
+  const sg = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
+  sg.addColorStop(0, 'rgba(251,191,36,0.25)');
+  sg.addColorStop(1, 'transparent');
+  ctx.fillStyle = sg;
+  ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
+// ── 동결 효과 시각화 ─────────────────────────────────────────
+// 동결 상태일 때 화면 가장자리에 파란 서리 효과를 그립니다.
+function drawFreezeOverlay() {
+  if (frozenTimer <= 0) return;
+  const alpha = Math.min(0.15, frozenTimer / 20 * 0.15);
+  ctx.fillStyle = `rgba(96,165,250,${alpha})`;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+
 // ── 게임 오버 ────────────────────────────────────────────────
 // 뱀이 충돌했을 때 호출됩니다.
 function gameOver() {
@@ -1588,6 +1887,15 @@ saveBtn.addEventListener('click', async ()=>{
 nameInput.addEventListener('keydown', e=>{ if(e.key==='Enter') saveBtn.click(); });
 // 건너뛰기: 이름 없이 최종 화면으로
 skipBtn.addEventListener('click', finishGameOver);
+
+// ── 아이템 버튼 바인딩 ──────────────────────────────────────
+// 컨트롤러의 아이템 사용 버튼 클릭 시 인벤토리 첫 아이템 발동
+document.getElementById('btn-item').addEventListener('click', useItem);
+// 키보드 Q 키로도 아이템 사용 가능
+document.addEventListener('keydown', e => {
+  if (document.activeElement === nameInput) return;
+  if (e.key === 'q' || e.key === 'Q') { e.preventDefault(); useItem(); }
+});
 
 // ── 시작 버튼 ────────────────────────────────────────────────
 // 일시 정지 중이면 재개, 아니면 게임 초기화 후 시작
