@@ -678,138 +678,197 @@ function getInterp() {
 
 function drawSnake() {
   const interp = getInterp();
-  if (interp.length===0) return;
+  if (interp.length === 0) return;
 
-  // 1) 몸통 연결선: 꼬리→머리 방향으로 그립니다 (머리가 위에 덮임)
-  for (let i=interp.length-1; i>0; i--) {
-    const a=interp[i], b=interp[i-1];
-    const ax=a.x*CELL+CELL/2, ay=a.y*CELL+CELL/2;
-    const bx=b.x*CELL+CELL/2, by=b.y*CELL+CELL/2;
-    // 꼬리 쪽은 진한 빨강, 머리 쪽은 밝은 빨강으로 그라데이션
-    const g=ctx.createLinearGradient(ax,ay,bx,by);
-    g.addColorStop(0, bodyColor(i,   interp.length));
-    g.addColorStop(1, bodyColor(i-1, interp.length));
-    ctx.strokeStyle=g;
-    ctx.lineWidth=CELL*0.76; // 칸 크기의 76% 두께
-    ctx.lineCap='round';     // 끝을 둥글게
-    ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(bx,by); ctx.stroke();
+  // 각 마디의 픽셀 중심 좌표를 미리 계산합니다
+  const pts = interp.map(s => ({
+    x: s.x * CELL + CELL / 2,
+    y: s.y * CELL + CELL / 2,
+  }));
+
+  // ── 몸통 두께: 머리(굵음) → 꼬리(가늘어짐) ──
+  const W = CELL * 0.82;          // 머리 쪽 최대 두께
+  const tailW = CELL * 0.35;      // 꼬리 끝 최소 두께
+
+  // 각 마디에서의 두께를 미리 계산합니다
+  function widthAt(i) {
+    const t = i / (pts.length - 1 || 1); // 0(머리)~1(꼬리)
+    return W - (W - tailW) * t;
   }
 
-  // 2) 몸통 원: 각 마디를 원으로 그려 3D 질감을 줍니다.
-  for (let i=interp.length-1; i>=1; i--) {
-    const s=interp[i];
-    const cx=s.x*CELL+CELL/2, cy=s.y*CELL+CELL/2;
-    const R=CELL*0.42;
-    // 왼쪽 위에서 빛이 오는 방사형 그라데이션 (입체감)
-    const grd=ctx.createRadialGradient(cx-2,cy-2,1,cx,cy,R);
-    grd.addColorStop(0, bodyColorLight(i,interp.length)); // 밝은 부분
-    grd.addColorStop(1, bodyColor(i,interp.length));      // 어두운 부분
-    ctx.fillStyle=grd;
-    ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.fill();
-    // 하이라이트 (작은 흰 원으로 반짝임 표현)
-    ctx.fillStyle='rgba(255,255,255,0.22)';
-    ctx.beginPath(); ctx.arc(cx-2,cy-2,R*0.38,0,Math.PI*2); ctx.fill();
-  }
-
-  // 3) 머리 그리기
-  const h=interp[0];
-  const hx=h.x*CELL+CELL/2, hy=h.y*CELL+CELL/2;
-  const R=CELL*0.50; // 머리는 몸통보다 약간 큼
-
-  // 머리 주변 부드러운 빨간 빛 (글로우)
-  const hGlow=ctx.createRadialGradient(hx,hy,1,hx,hy,R*1.6);
-  hGlow.addColorStop(0,'rgba(239,68,68,0.35)');
-  hGlow.addColorStop(1,'transparent');
-  ctx.fillStyle=hGlow;
-  ctx.beginPath(); ctx.arc(hx,hy,R*1.6,0,Math.PI*2); ctx.fill();
-
-  // 머리 본체 (연분홍 → 빨강 → 진한 빨강 그라데이션)
-  const hGrd=ctx.createRadialGradient(hx-3,hy-4,1,hx,hy,R);
-  hGrd.addColorStop(0,'#FCA5A5');   // 연분홍 (하이라이트)
-  hGrd.addColorStop(0.5,'#EF4444'); // 밝은 빨강
-  hGrd.addColorStop(1,'#B91C1C');   // 진한 빨강
-  ctx.fillStyle=hGrd;
-  ctx.beginPath(); ctx.arc(hx,hy,R,0,Math.PI*2); ctx.fill();
-
-  // 머리 상단 하이라이트 (타원형으로 빛 반사 표현)
-  ctx.fillStyle='rgba(255,255,255,0.38)';
+  // ── 1단계: 그림자 (부드러운 검정 반투명) ──
+  ctx.save();
+  ctx.globalAlpha = 0.18;
+  ctx.lineWidth = W + 4;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = '#000';
   ctx.beginPath();
-  ctx.ellipse(hx-3,hy-4,R*0.42,R*0.28,-0.4,0,Math.PI*2);
+  ctx.moveTo(pts[0].x + 3, pts[0].y + 4);
+  for (let i = 1; i < pts.length; i++) {
+    ctx.lineTo(pts[i].x + 3, pts[i].y + 4);
+  }
+  ctx.stroke();
+  ctx.restore();
+
+  // ── 2단계: 메인 몸통 (끊김 없는 두꺼운 주황색 라인) ──
+  // 세그먼트마다 폭이 다르므로 구간별로 그립니다
+  for (let i = pts.length - 2; i >= 0; i--) {
+    const a = pts[i + 1], b = pts[i];
+    const w = (widthAt(i) + widthAt(i + 1)) / 2; // 두 마디 평균 두께
+
+    // 주황 그라데이션: 머리(밝은 노랑) → 꼬리(진한 주황)
+    const g = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
+    g.addColorStop(0, bodyColor(i + 1, pts.length));
+    g.addColorStop(1, bodyColor(i, pts.length));
+
+    ctx.strokeStyle = g;
+    ctx.lineWidth = w;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+  }
+
+  // ── 3단계: 하이라이트 줄 (몸통 중앙을 따라 밝은 노란 띠) ──
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  for (let i = pts.length - 2; i >= 0; i--) {
+    const a = pts[i + 1], b = pts[i];
+    const w = widthAt(i) * 0.35; // 하이라이트는 몸통의 35% 두께
+    ctx.strokeStyle = 'rgba(255,230,140,0.45)';
+    ctx.lineWidth = w;
+    // 약간 위쪽으로 오프셋 (빛 반사 표현)
+    ctx.beginPath();
+    ctx.moveTo(a.x - 1, a.y - 2);
+    ctx.lineTo(b.x - 1, b.y - 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // ── 4단계: 가장자리 어두운 테두리 (양쪽 경계선) ──
+  // 위아래 오프셋으로 어두운 경계를 그려 입체감을 강화합니다
+  for (let i = pts.length - 2; i >= 0; i--) {
+    const a = pts[i + 1], b = pts[i];
+    const w = (widthAt(i) + widthAt(i + 1)) / 2;
+
+    // 이동 방향에 수직인 방향 계산
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+    const nx = -dy / len, ny = dx / len; // 수직 벡터
+
+    ctx.strokeStyle = 'rgba(180,80,0,0.3)';
+    ctx.lineWidth = 1.5;
+    ctx.lineCap = 'round';
+    // 위쪽 가장자리
+    ctx.beginPath();
+    ctx.moveTo(a.x + nx * w * 0.45, a.y + ny * w * 0.45);
+    ctx.lineTo(b.x + nx * w * 0.45, b.y + ny * w * 0.45);
+    ctx.stroke();
+    // 아래쪽 가장자리
+    ctx.beginPath();
+    ctx.moveTo(a.x - nx * w * 0.45, a.y - ny * w * 0.45);
+    ctx.lineTo(b.x - nx * w * 0.45, b.y - ny * w * 0.45);
+    ctx.stroke();
+  }
+
+  // ── 5단계: 머리 그리기 ──
+  const h = pts[0];
+  const hx = h.x, hy = h.y;
+  const R = CELL * 0.55; // 머리 반지름 (몸통보다 약간 큼)
+  const ed = dir;                    // 이동 방향 벡터
+  const perp = { x: -ed.y, y: ed.x }; // 수직 방향 벡터
+
+  // 머리 본체 (주황색 3D 구체)
+  const hGrd = ctx.createRadialGradient(hx - 3, hy - 3, 1, hx, hy, R);
+  hGrd.addColorStop(0, '#FFD966');   // 밝은 노란 하이라이트
+  hGrd.addColorStop(0.4, '#F5A623'); // 밝은 주황
+  hGrd.addColorStop(1, '#D4780A');   // 진한 주황 테두리
+  ctx.fillStyle = hGrd;
+  ctx.beginPath(); ctx.arc(hx, hy, R, 0, Math.PI * 2); ctx.fill();
+
+  // 머리 상단 하이라이트 (큰 빛 반사)
+  ctx.fillStyle = 'rgba(255,255,255,0.45)';
+  ctx.beginPath();
+  ctx.ellipse(hx - 2, hy - 3, R * 0.45, R * 0.25, -0.4, 0, Math.PI * 2);
   ctx.fill();
 
-  // 왕관 같은 뿔 2개 (머리 뒤쪽 양 옆에 노란색 삼각형)
-  const ed=dir;
-  const perp={x:-ed.y, y:ed.x}; // 이동 방향에 수직인 벡터
-  const fwd=3;
-  [1,-1].forEach(s => {
-    // 뿔 기준점: 머리 뒤쪽(-ed 방향) + 양 옆(perp 방향)
-    const baseX = hx - ed.x * 4 + perp.x * 3.5 * s;
-    const baseY = hy - ed.y * 4 + perp.y * 3.5 * s;
-    // 뿔 꼭대기: 위쪽으로 솟음
-    const tipX = baseX - ed.x * 3 + perp.x * 1.5 * s;
-    const tipY = baseY - ed.y * 3 + perp.y * 1.5 * s;
-    ctx.fillStyle = '#FBBF24'; // 황금색
+  // 눈 2개 (큰 동그란 눈)
+  const fwd = 3;
+  const e1 = { x: hx + ed.x * fwd + perp.x * 3.5, y: hy + ed.y * fwd + perp.y * 3.5 };
+  const e2 = { x: hx + ed.x * fwd - perp.x * 3.5, y: hy + ed.y * fwd - perp.y * 3.5 };
+  [e1, e2].forEach(e => {
+    // 흰자
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(e.x, e.y, 4.0, 0, Math.PI * 2); ctx.fill();
+    // 검은 동공
+    ctx.fillStyle = '#1a1a1a';
+    ctx.beginPath(); ctx.arc(e.x + ed.x * 0.8, e.y + ed.y * 0.8, 2.4, 0, Math.PI * 2); ctx.fill();
+    // 큰 반짝임
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(e.x - 0.6, e.y - 0.8, 1.1, 0, Math.PI * 2); ctx.fill();
+    // 작은 반짝임
+    ctx.beginPath(); ctx.arc(e.x + 1.2, e.y + 0.8, 0.4, 0, Math.PI * 2); ctx.fill();
+  });
+
+  // 볼터치 (양 볼에 핑크 블러시)
+  [1, -1].forEach(s => {
+    const bx = hx + perp.x * 5.8 * s - ed.x * 1;
+    const by = hy + perp.y * 5.8 * s - ed.y * 1;
+    ctx.fillStyle = 'rgba(255,160,120,0.45)';
     ctx.beginPath();
-    ctx.moveTo(baseX - perp.x * 1.5 * s, baseY - perp.y * 1.5 * s);
-    ctx.lineTo(tipX, tipY);
-    ctx.lineTo(baseX + perp.x * 1.5 * s, baseY + perp.y * 1.5 * s);
-    ctx.closePath();
+    ctx.ellipse(bx, by, 3.2, 1.8, Math.atan2(perp.y, perp.x), 0, Math.PI * 2);
     ctx.fill();
-    // 뿔 하이라이트
-    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+  });
+
+  // 혀 내밀기 (주기적으로 빨간 혀)
+  if (Math.floor(tickCount / 10) % 4 === 0) {
+    const tx = hx + ed.x * R, ty = hy + ed.y * R;
+    ctx.strokeStyle = '#E74C3C';
+    ctx.lineWidth = 1.5;
+    ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.moveTo(baseX - perp.x * 0.8 * s, baseY - perp.y * 0.8 * s);
-    ctx.lineTo(tipX, tipY);
-    ctx.lineTo(baseX, baseY);
-    ctx.closePath();
-    ctx.fill();
-  });
+    ctx.moveTo(tx, ty);
+    ctx.lineTo(tx + ed.x * 5, ty + ed.y * 5);
+    ctx.stroke();
+    // 갈라진 혀 끝
+    ctx.beginPath();
+    ctx.moveTo(tx + ed.x * 5, ty + ed.y * 5);
+    ctx.lineTo(tx + ed.x * 5 + perp.x * 2, ty + ed.y * 5 + perp.y * 2);
+    ctx.moveTo(tx + ed.x * 5, ty + ed.y * 5);
+    ctx.lineTo(tx + ed.x * 5 - perp.x * 2, ty + ed.y * 5 - perp.y * 2);
+    ctx.stroke();
+  }
 
-  // 큰 눈 2개 (귀여운 캐릭터 느낌으로 크게)
-  const e1={x:hx+ed.x*fwd+perp.x*3.5, y:hy+ed.y*fwd+perp.y*3.5}; // 왼쪽 눈
-  const e2={x:hx+ed.x*fwd-perp.x*3.5, y:hy+ed.y*fwd-perp.y*3.5}; // 오른쪽 눈
-  [e1,e2].forEach(e=>{
-    ctx.fillStyle='#fff';                          // 흰자 (크게)
-    ctx.beginPath(); ctx.arc(e.x,e.y,3.8,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle='#1E1E1E';                       // 홍채 (검은색 큰 눈)
-    ctx.beginPath(); ctx.arc(e.x+ed.x*0.6,e.y+ed.y*0.6,2.5,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle='#fff';                          // 눈 반짝임 (큰 것)
-    ctx.beginPath(); ctx.arc(e.x+ed.x*0.2-0.8,e.y+ed.y*0.2-0.8,1.0,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle='#fff';                          // 눈 반짝임 (작은 것)
-    ctx.beginPath(); ctx.arc(e.x+ed.x*0.6+0.8,e.y+ed.y*0.6+1.0,0.4,0,Math.PI*2); ctx.fill();
-  });
-
-  // 볼터치 (귀여운 핑크 타원 — 더 진하게)
-  [1,-1].forEach(s=>{
-    const bx=hx+perp.x*5.5*s, by=hy+perp.y*5.5*s;
-    ctx.fillStyle='rgba(255,180,180,0.55)';
-    ctx.beginPath(); ctx.ellipse(bx,by,3.5,2,Math.atan2(perp.y,perp.x),0,Math.PI*2); ctx.fill();
-  });
-
-  // 작은 입 (귀여운 미소 — 콧구멍 대신)
-  const mx=hx+ed.x*5.5, my=hy+ed.y*5.5;
-  ctx.strokeStyle='#7F1D1D'; // 진한 빨강 입
-  ctx.lineWidth=1;
-  ctx.beginPath();
-  // 이동 방향에 따라 미소 곡선을 그립니다
-  ctx.arc(mx, my, 2, 0, Math.PI); // 아래쪽 반원 (미소)
-  ctx.stroke();
+  // ── 6단계: 꼬리 끝 둥글게 마무리 ──
+  if (pts.length > 1) {
+    const tail = pts[pts.length - 1];
+    const tR = tailW * 0.5;
+    const tGrd = ctx.createRadialGradient(tail.x - 1, tail.y - 1, 0, tail.x, tail.y, tR);
+    tGrd.addColorStop(0, '#E8963A');
+    tGrd.addColorStop(1, '#C06A1A');
+    ctx.fillStyle = tGrd;
+    ctx.beginPath(); ctx.arc(tail.x, tail.y, tR, 0, Math.PI * 2); ctx.fill();
+  }
 }
 
-// 뱀 몸통 색상: 빨간→진한 빨강 (머리쪽 밝고 꼬리쪽 어두움)
+// 뱀 몸통 색상: 밝은 주황 → 진한 주황 (머리쪽 밝고 꼬리쪽 어두움)
 function bodyColor(i, len) {
-  const t=i/len; // 0(머리) ~ 1(꼬리)
-  const r=Math.round(239-t*60);  // 빨강: 239→179
-  const g=Math.round(68-t*40);   // 초록: 68→28
-  const b=Math.round(68-t*40);   // 파랑: 68→28
+  const t = i / (len - 1 || 1); // 0(머리) ~ 1(꼬리)
+  const r = Math.round(245 - t * 50);  // 245→195
+  const g = Math.round(166 - t * 70);  // 166→96
+  const b = Math.round(35 - t * 15);   // 35→20
   return `rgb(${r},${g},${b})`;
 }
-// 빛 받는 면의 밝은 색상: 연분홍 (그라데이션 하이라이트용)
+// 빛 받는 면의 밝은 색상 (하이라이트용)
 function bodyColorLight(i, len) {
-  const t=i/len;
-  const r=Math.round(252-t*40);  // 밝은 분홍: 252→212
-  const g=Math.round(165-t*60);  // 165→105
-  const b=Math.round(165-t*60);  // 165→105
+  const t = i / (len - 1 || 1);
+  const r = Math.round(255 - t * 30);
+  const g = Math.round(210 - t * 60);
+  const b = Math.round(80 - t * 30);
   return `rgb(${r},${g},${b})`;
 }
 
