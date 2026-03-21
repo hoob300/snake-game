@@ -13,9 +13,11 @@ body {
   font-family: 'Segoe UI', system-ui, sans-serif;
   color: #fff;
   overflow-x: hidden;
-  /* safe area for notched phones */
+  /* safe area (노치/다이나믹 아일랜드 대응) */
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
 /* ── Container ───────────────────────────────────────────── */
@@ -24,9 +26,7 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 10px;
-  padding: 8px 0 16px;
-  padding-left: env(safe-area-inset-left);
-  padding-right: env(safe-area-inset-right);
+  padding: 8px 20px 16px;
   width: 100%;
   max-width: 600px;
 }
@@ -34,14 +34,13 @@ body {
 /* ── Header (한 줄 상단 바) ──────────────────────────────── */
 header {
   width: 100%;
-  padding: 0 12px;
 }
 
 .top-bar {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: space-between;
-  gap: clamp(6px, 2vw, 12px);
+  gap: clamp(6px, 2vw, 10px);
   width: 100%;
 }
 
@@ -49,10 +48,11 @@ header {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   background: rgba(255,255,255,0.06);
   border: 1px solid rgba(255,255,255,0.1);
   border-radius: 10px;
-  padding: clamp(5px, 1.5vw, 8px) clamp(10px, 3vw, 16px);
+  padding: clamp(5px, 1.5vw, 8px) clamp(8px, 2.5vw, 14px);
   flex: 1;
   min-width: 0;
 }
@@ -62,10 +62,11 @@ header {
   color: #6b7280;
   text-transform: uppercase;
   letter-spacing: 0.4px;
+  white-space: nowrap;
 }
 
 .score-item .value {
-  font-size: clamp(16px, 4.5vw, 20px);
+  font-size: clamp(15px, 4.5vw, 20px);
   font-weight: 700;
   color: #4ade80;
   margin-top: 1px;
@@ -77,27 +78,31 @@ header {
   color: #facc15;
   border: 1px solid rgba(250,204,21,0.35);
   border-radius: 10px;
-  padding: clamp(8px, 2vw, 12px) clamp(10px, 3vw, 16px);
+  padding: clamp(6px, 1.5vw, 10px) clamp(10px, 3vw, 16px);
   font-size: clamp(10px, 2.8vw, 13px);
   font-weight: 600;
   cursor: pointer;
   letter-spacing: 0.3px;
   white-space: nowrap;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
   transition: background .15s, box-shadow .15s, transform .1s;
   -webkit-tap-highlight-color: transparent;
 }
 .ranking-btn:hover  { background: rgba(250,204,21,0.2); box-shadow: 0 0 14px rgba(250,204,21,.25); }
 .ranking-btn:active { transform: scale(0.96); }
 
-/* ── Canvas (넓고 세로로 긴 형태) ────────────────────────── */
+/* ── Canvas (전폭 반응형, 세로로 긴 형태) ────────────────── */
 .canvas-wrapper {
   position: relative;
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 0 30px rgba(78,197,241,0.25), 0 0 0 2px rgba(78,197,241,0.3);
-  width: calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right));
-  max-width: 600px;
+  /* 좌우 20px 패딩을 뺀 전체 너비 */
+  width: calc(100vw - 40px - env(safe-area-inset-left) - env(safe-area-inset-right));
+  max-width: 560px;
+  /* 세로:가로 = 6:5 비율 유지 */
   aspect-ratio: 5 / 6;
 }
 
@@ -241,7 +246,7 @@ header {
 }
 .skip-btn:hover { color: #9ca3af; }
 
-/* ── D-Pad ───────────────────────────────────────────────── */
+/* ── D-Pad (모바일 방향키) ──────────────────────────────── */
 .controls {
   width: 100%;
   display: flex;
@@ -262,8 +267,8 @@ header {
 }
 
 .dpad-btn {
-  width:  clamp(56px, 15vw, 64px);
-  height: clamp(56px, 15vw, 64px);
+  width:  clamp(52px, 14vw, 64px);
+  height: clamp(52px, 14vw, 64px);
   background: rgba(255,255,255,0.07);
   border: 1px solid rgba(255,255,255,0.12);
   border-radius: 14px;
@@ -293,7 +298,9 @@ header {
   justify-content: center;
   z-index: 1000;
   animation: fadeIn .2s ease;
-  padding: 16px;
+  padding: 20px;
+  padding-left: calc(20px + env(safe-area-inset-left));
+  padding-right: calc(20px + env(safe-area-inset-right));
 }
 .ranking-modal.hidden { display: none; }
 
@@ -379,9 +386,19 @@ header {
 
 /* ── 초소형 화면 (360px 미만) ────────────────────────────── */
 @media (max-width: 359px) {
-  .container { padding: 6px 0 12px; gap: 8px; }
-  .score-item { padding: 4px 6px; }
-  .dpad-btn { width: 48px; height: 48px; }
+  .container { padding: 6px 12px 12px; gap: 8px; }
+  .top-bar { gap: 4px; }
+  .score-item { padding: 4px 6px; border-radius: 8px; }
+  .score-item .label { font-size: 7px; }
+  .score-item .value { font-size: 14px; }
+  .ranking-btn { padding: 6px 8px; font-size: 9px; }
+  .dpad-btn { width: 46px; height: 46px; border-radius: 10px; }
+}
+
+/* ── 중간 화면 (360~479px) ───────────────────────────────── */
+@media (min-width: 360px) and (max-width: 479px) {
+  .container { padding: 8px 16px 14px; }
+  .dpad-btn { width: 54px; height: 54px; }
 }
 
 /* ── 가로 모드 (landscape) ───────────────────────────────── */
@@ -392,17 +409,18 @@ header {
     flex-wrap: wrap;
     align-items: flex-start;
     max-width: 100vw;
-    padding: 10px 16px;
-    gap: 12px;
+    padding: 8px 20px;
+    gap: 10px;
     justify-content: center;
   }
   header { width: auto; flex: 0 0 auto; }
-  .score-item { padding: 5px 10px; }
-  .score-item .value { font-size: 16px; }
+  .top-bar { flex-direction: column; gap: 4px; }
+  .score-item { padding: 4px 10px; }
+  .score-item .value { font-size: 15px; }
   .canvas-wrapper {
-    width: min(350px, calc(100vh - 60px));
+    width: min(350px, calc(100vh - 40px));
     flex: 0 0 auto;
   }
   .controls { flex: 0 0 auto; align-items: center; }
-  .dpad-btn { width: 50px; height: 50px; font-size: 16px; }
+  .dpad-btn { width: 48px; height: 48px; font-size: 16px; }
 }
