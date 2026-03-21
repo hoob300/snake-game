@@ -1282,6 +1282,10 @@ const DIRS={
   ArrowRight:{x:1,y:0}, d:{x:1,y:0},  // 오른쪽
 };
 document.addEventListener('keydown', e=>{
+  // ★ 이름 입력칸에 포커스 중이면 게임 키 처리를 하지 않습니다.
+  //    (방향키, Space, WASD 등이 입력칸으로 정상 입력됩니다)
+  if (document.activeElement === nameInput) return;
+
   // Space/Escape: 일시 정지 토글
   if (e.key===' '||e.key==='Escape') {
     e.preventDefault();
@@ -1392,7 +1396,8 @@ function escHtml(s) {
 }
 
 // 랭킹 모달 열기·닫기
-function openRankingModal()  { renderRankings(); rankingModal.classList.remove('hidden'); }
+// 랭킹 데이터를 불러온 뒤 모달을 엽니다 (async로 저장 직후에도 최신 데이터 보장)
+async function openRankingModal() { await renderRankings(); rankingModal.classList.remove('hidden'); }
 function closeRankingModal() { rankingModal.classList.add('hidden'); }
 
 // ── 랭킹 이벤트 바인딩 ──────────────────────────────────────
@@ -1403,9 +1408,20 @@ rankingModal.addEventListener('click', e=>{ if(e.target===rankingModal) closeRan
 
 // 이름 저장 버튼: 랭킹에 등록 후 랭킹 모달 열기
 saveBtn.addEventListener('click', async ()=>{
-  await saveRanking(nameInput.value, score);
-  finishGameOver();
-  openRankingModal();
+  // 저장 버튼 비활성화 (중복 클릭 방지)
+  saveBtn.disabled = true;
+  saveBtn.textContent = '저장 중...';
+  try {
+    await saveRanking(nameInput.value, score);
+    finishGameOver();
+    // 저장 완료 후 랭킹 목록을 다시 불러와서 표시
+    await openRankingModal();
+  } catch (err) {
+    console.error('저장 실패:', err);
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = '저장';
+  }
 });
 // Enter 키도 저장 버튼과 동일하게 처리
 nameInput.addEventListener('keydown', e=>{ if(e.key==='Enter') saveBtn.click(); });
