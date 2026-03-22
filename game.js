@@ -757,7 +757,7 @@ function drawGrid() {
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
       if (OBSTACLES[r][c]) continue; // 장애물 칸은 나중에 따로 그림
-      ctx.fillStyle = (r + c) % 2 === 0 ? '#4A7A2E' : '#3D6B25';
+      ctx.fillStyle = (r + c) % 2 === 0 ? '#6DB844' : '#5FA838';
       ctx.fillRect(c * CELL, r * CELL, CELL, CELL);
     }
   }
