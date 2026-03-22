@@ -2078,28 +2078,66 @@ function updateInventoryUI() {
 // 필드에 놓인 아이템을 반짝이는 원형으로 그립니다.
 function drawFieldItems() {
   const now = performance.now();
+  const t = now / 1000; // 초 단위
   fieldItems.forEach(item => {
     const x = item.x * CELL, y = item.y * CELL;
-    const cx = x + CELL / 2, cy = y + CELL / 2;
-    const pulse = 0.8 + 0.2 * Math.sin(now / 300 + item.x + item.y); // 맥동
-    const R = CELL * 0.42 * pulse;
+    const cx = x + CELL / 2;
     const color = ITEM_COLORS[item.type];
 
+    // 개별 오프셋 (아이템마다 다른 타이밍)
+    const offset = item.x * 1.3 + item.y * 2.1;
+
+    // 위아래 바운스 (0~6px)
+    const bounce = Math.abs(Math.sin(t * 2.5 + offset)) * 6;
+    const cy = y + CELL / 2 - 3 - bounce;
+
+    // 크기 맥동 (80%~120%)
+    const scalePulse = 1 + 0.2 * Math.sin(t * 3 + offset);
+    const R = CELL * 0.52 * scalePulse;
+
+    // 바닥 그림자 (바운스 높이에 따라 크기 변화)
+    const shadowScale = 1 - bounce / 18;
+    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+    ctx.beginPath();
+    ctx.ellipse(x + CELL / 2, y + CELL - 2, CELL * 0.32 * shadowScale, 3 * shadowScale, 0, 0, Math.PI * 2);
+    ctx.fill();
+
     // 글로우 효과
-    const grd = ctx.createRadialGradient(cx, cy, 1, cx, cy, CELL * 0.9);
-    grd.addColorStop(0, color.replace(')', ',0.4)').replace('rgb', 'rgba'));
+    const grd = ctx.createRadialGradient(cx, cy, 1, cx, cy, CELL * 1.0);
+    grd.addColorStop(0, color.replace(')', ',0.45)').replace('rgb', 'rgba'));
     grd.addColorStop(1, 'transparent');
     ctx.fillStyle = grd;
-    ctx.fillRect(x - CELL * 0.3, y - CELL * 0.3, CELL * 1.6, CELL * 1.6);
+    ctx.fillRect(x - CELL * 0.4, cy - CELL * 0.6, CELL * 1.8, CELL * 1.8);
 
-    // 아이템 배경 원
-    ctx.fillStyle = color;
-    ctx.globalAlpha = 0.85;
+    // 아이템 배경 원 (3D 입체)
+    // 어두운 하단면
+    ctx.fillStyle = color.replace(')', ',0.4)').replace('rgb', 'rgba');
+    ctx.beginPath(); ctx.arc(cx, cy + 2, R, 0, Math.PI * 2); ctx.fill();
+
+    // 메인 원 (그라데이션)
+    const bgGrd = ctx.createRadialGradient(cx - R * 0.3, cy - R * 0.3, 1, cx, cy, R);
+    bgGrd.addColorStop(0, 'rgba(255,255,255,0.35)');
+    bgGrd.addColorStop(0.4, color);
+    bgGrd.addColorStop(1, color.replace(')', ',0.7)').replace('rgb', 'rgba'));
+    ctx.fillStyle = bgGrd;
+    ctx.globalAlpha = 0.9;
     ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
     ctx.globalAlpha = 1;
 
-    // 아이콘 텍스트
-    ctx.font = `${Math.round(CELL * 0.65)}px sans-serif`;
+    // 테두리
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
+
+    // 하이라이트 (광택)
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.beginPath();
+    ctx.ellipse(cx - R * 0.2, cy - R * 0.35, R * 0.4, R * 0.2, -0.4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 아이콘 텍스트 (더 크게)
+    const fontSize = Math.round(CELL * 0.85 * scalePulse);
+    ctx.font = `${fontSize}px sans-serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(ITEM_ICONS[item.type], cx, cy + 1);
   });
