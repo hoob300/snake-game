@@ -254,75 +254,26 @@ header {
   padding-bottom: 4px;
 }
 
-/* ── 스와이프 제스처 존 ──────────────────────────────────── */
-.swipe-zone {
-  position: relative;
-  width: clamp(140px, 38vw, 180px);
-  height: clamp(140px, 38vw, 180px);
-  background: rgba(255,255,255,0.04);
-  border: 2px solid rgba(255,255,255,0.1);
-  border-radius: 50%;
+.dpad {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  touch-action: none;
-  user-select: none;
-  -webkit-tap-highlight-color: transparent;
-  overflow: hidden;
+  gap: clamp(4px, 1.5vw, 6px);
 }
 
-.swipe-arrows {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
+.dpad-row {
+  display: flex;
+  gap: clamp(4px, 1.5vw, 6px);
 }
-.sw-arrow {
-  position: absolute;
-  font-size: 16px;
-  color: rgba(255,255,255,0.15);
-  transition: color 0.15s, transform 0.15s;
-}
-.sw-arrow.sw-up    { top: 10px; left: 50%; transform: translateX(-50%); }
-.sw-arrow.sw-down  { bottom: 10px; left: 50%; transform: translateX(-50%); }
-.sw-arrow.sw-left  { left: 10px; top: 50%; transform: translateY(-50%); }
-.sw-arrow.sw-right { right: 10px; top: 50%; transform: translateY(-50%); }
-
-.sw-arrow.active {
-  color: #4ade80;
-  transform: translateX(-50%) scale(1.4);
-}
-.sw-arrow.sw-left.active  { transform: translateY(-50%) scale(1.4); }
-.sw-arrow.sw-right.active { transform: translateY(-50%) scale(1.4); }
-
-.swipe-label {
-  font-size: 11px;
-  font-weight: 700;
-  color: rgba(255,255,255,0.12);
-  letter-spacing: 3px;
-  pointer-events: none;
-}
-
-/* 스와이프 방향 피드백 라인 */
-.swipe-trail {
-  position: absolute;
-  width: 4px; height: 4px;
-  background: #4ade80;
-  border-radius: 50%;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.3s;
-  box-shadow: 0 0 8px #4ade80;
-}
-.swipe-trail.show { opacity: 1; }
 
 .dpad-btn {
-  width:  clamp(46px, 12vw, 54px);
-  height: clamp(46px, 12vw, 54px);
+  width:  clamp(52px, 14vw, 64px);
+  height: clamp(52px, 14vw, 64px);
   background: rgba(255,255,255,0.07);
   border: 1px solid rgba(255,255,255,0.12);
   border-radius: 14px;
   color: #e5e7eb;
-  font-size: clamp(16px, 4.5vw, 20px);
+  font-size: clamp(18px, 5vw, 22px);
   cursor: pointer;
   transition: background .12s, transform .08s;
   display: flex;
@@ -334,6 +285,7 @@ header {
 }
 .dpad-btn:hover  { background: rgba(74,222,128,0.15); border-color: rgba(74,222,128,.4); color: #4ade80; }
 .dpad-btn:active { transform: scale(0.90); background: rgba(74,222,128,0.28); }
+.dpad-btn.center { font-size: clamp(14px, 4vw, 18px); }
 
 /* ── 아이템 패널 (D-패드 옆) ─────────────────────────────── */
 .controls {
