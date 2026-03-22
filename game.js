@@ -1891,55 +1891,103 @@ function drawEnemy(e) {
 function drawBosses() { bossEnemies.forEach(b=>drawBoss(b)); }
 
 function drawBoss(boss) {
+  const now = performance.now();
   // 7틱 이동 주기 내에서 보간 위치 계산
   const t = Math.min(1, (boss.moveTimer + tickProgress) / 7);
   const rx = boss.ox!=null ? boss.ox+(boss.x-boss.ox)*t : boss.x;
   const ry = boss.oy!=null ? boss.oy+(boss.y-boss.oy)*t : boss.y;
-  const x=rx*CELL, y=ry*CELL;
-  const W=CELL*3, H=CELL*3; // 가로·세로 60px (3칸×20px)
-  const cx=x+W/2, cy=y+H/2; // 중심 좌표
-  const st=BOSS_STYLE[boss.skillType]; // 스킬 타입별 색상
+  const baseX=rx*CELL, baseY=ry*CELL;
+  const W=CELL*3, H=CELL*3;
+  const st=BOSS_STYLE[boss.skillType];
 
-  // 숨 쉬는 듯한 맥동 글로우 (glowPhase로 크기가 파도처럼 변함)
+  // 위아래 바운스 모션
+  const bounce = Math.sin(now / 400 + boss.x * 2) * 4;
+  const x = baseX, y = baseY + bounce;
+  const cx=x+W/2, cy=y+H/2;
+  const rad = W / 2 - 2; // 최대 둥글기 = 거의 원형
+
+  // ── 바닥 그림자 (바운스와 분리) ──
+  const shadowScale = 1 - Math.abs(bounce) / 12;
+  ctx.fillStyle = 'rgba(0,0,0,0.2)';
+  ctx.beginPath();
+  ctx.ellipse(baseX + W/2, baseY + H - 2, W * 0.4 * shadowScale, 4 * shadowScale, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // ── 팔다리 (몸통 뒤에 그려야 함) ──
+  const limbTime = now / 300;
+  const limbColor = st.border;
+
+  // 왼손 (몸체 왼쪽)
+  const lhSwing = Math.sin(limbTime + 1) * 8;
+  const lhx = x - 6, lhy = cy - 8 + lhSwing;
+  ctx.fillStyle = limbColor;
+  ctx.beginPath(); ctx.arc(lhx, lhy, 6, 0, Math.PI * 2); ctx.fill();
+  // 왼팔 연결
+  ctx.strokeStyle = limbColor; ctx.lineWidth = 4; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x + 4, cy - 4); ctx.lineTo(lhx, lhy); ctx.stroke();
+
+  // 오른손 (몸체 오른쪽)
+  const rhSwing = Math.sin(limbTime + 3) * 8;
+  const rhx = x + W + 6, rhy = cy - 8 + rhSwing;
+  ctx.fillStyle = limbColor;
+  ctx.beginPath(); ctx.arc(rhx, rhy, 6, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = limbColor; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(x + W - 4, cy - 4); ctx.lineTo(rhx, rhy); ctx.stroke();
+
+  // 왼발 (몸체 아래 왼쪽)
+  const lfSwing = Math.sin(limbTime + 0.5) * 5;
+  const lfx = cx - W * 0.25, lfy = y + H + 5 + lfSwing;
+  ctx.fillStyle = limbColor;
+  ctx.beginPath(); ctx.ellipse(lfx, lfy, 7, 5, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = limbColor; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(lfx, y + H - 4); ctx.lineTo(lfx, lfy - 3); ctx.stroke();
+
+  // 오른발 (몸체 아래 오른쪽)
+  const rfSwing = Math.sin(limbTime + 2.5) * 5;
+  const rfx = cx + W * 0.25, rfy = y + H + 5 + rfSwing;
+  ctx.fillStyle = limbColor;
+  ctx.beginPath(); ctx.ellipse(rfx, rfy, 7, 5, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = limbColor; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(rfx, y + H - 4); ctx.lineTo(rfx, rfy - 3); ctx.stroke();
+
+  // ── 글로우 맥동 ──
   const gs=W*(0.65+Math.sin(boss.glowPhase)*0.12);
   const grd=ctx.createRadialGradient(cx,cy,4,cx,cy,gs);
   grd.addColorStop(0,st.glow);
-  grd.addColorStop(0.55,st.glow.replace('0.55','0.18')); // 중간은 연하게
+  grd.addColorStop(0.55,st.glow.replace('0.55','0.18'));
   grd.addColorStop(1,'transparent');
   ctx.fillStyle=grd;
   ctx.fillRect(x-gs*0.5,y-gs*0.5,W+gs,H+gs);
 
-  // 배경 패널 (둥근 사각형)
+  // ── 배경 패널 (최대 둥글기 — 거의 원형) ──
   ctx.fillStyle=st.bg;
-  roundRect(ctx,x+1,y+1,W-2,H-2,10); ctx.fill();
-  ctx.strokeStyle=st.border; ctx.lineWidth=0.8;
-  roundRect(ctx,x+1,y+1,W-2,H-2,10); ctx.stroke();
+  roundRect(ctx,x+2,y+2,W-4,H-4,rad); ctx.fill();
+  ctx.strokeStyle=st.border; ctx.lineWidth=1.2;
+  roundRect(ctx,x+2,y+2,W-4,H-4,rad); ctx.stroke();
 
-  // 태이 얼굴 사진을 원형으로 잘라 중앙에 표시
-  const faceR = W*0.42; // 얼굴 원 반지름
+  // ── 얼굴 ──
+  const faceR = W*0.38;
   ctx.save();
   ctx.beginPath();
   ctx.arc(cx, cy, faceR, 0, Math.PI*2);
-  ctx.clip(); // 원 안에만 그리기 (원형 마스크)
+  ctx.clip();
   if (bossImg.complete && bossImg.naturalWidth>0) {
-    // tae.jpg 파일이 있으면 사진 표시
     ctx.drawImage(bossImg, cx-faceR, cy-faceR, faceR*2, faceR*2);
   } else {
-    // 사진이 없으면 기본 캐릭터 얼굴 그리기
     const fg=ctx.createRadialGradient(cx-3,cy-4,2,cx,cy,faceR);
-    fg.addColorStop(0,'#fde68a'); fg.addColorStop(1,'#f59e0b'); // 노란 피부색
+    fg.addColorStop(0,'#fde68a'); fg.addColorStop(1,'#f59e0b');
     ctx.fillStyle=fg; ctx.fillRect(cx-faceR,cy-faceR,faceR*2,faceR*2);
-    ctx.fillStyle='#1a1a1a'; // 눈 (검정)
+    ctx.fillStyle='#1a1a1a';
     ctx.beginPath();
     ctx.ellipse(cx-6,cy-4,3.5,4,0,0,Math.PI*2);
     ctx.ellipse(cx+6,cy-4,3.5,4,0,0,Math.PI*2);
     ctx.fill();
-    ctx.fillStyle='#fff'; // 눈 반짝임
+    ctx.fillStyle='#fff';
     ctx.beginPath();
     ctx.ellipse(cx-5,cy-5,1.2,1.5,0,0,Math.PI*2);
     ctx.ellipse(cx+7,cy-5,1.2,1.5,0,0,Math.PI*2);
     ctx.fill();
-    ctx.strokeStyle='#92400e'; ctx.lineWidth=2; // 입
+    ctx.strokeStyle='#92400e'; ctx.lineWidth=2;
     ctx.beginPath(); ctx.arc(cx,cy+5,6,0.2,Math.PI-0.2); ctx.stroke();
   }
   ctx.restore();
@@ -1948,8 +1996,8 @@ function drawBoss(boss) {
   ctx.strokeStyle=st.border; ctx.lineWidth=1.8;
   ctx.beginPath(); ctx.arc(cx,cy,faceR,0,Math.PI*2); ctx.stroke();
 
-  // 우하단에 스킬 종류 아이콘 표시
-  const iconX=x+W-12, iconY=y+H-12;
+  // ── 스킬 아이콘 (우하단) ──
+  const iconX=x+W-10, iconY=y+H-10;
   ctx.fillStyle='rgba(0,0,0,0.65)';
   ctx.beginPath(); ctx.arc(iconX,iconY,9,0,Math.PI*2); ctx.fill();
   ctx.strokeStyle=st.border; ctx.lineWidth=1;
@@ -1959,17 +2007,16 @@ function drawBoss(boss) {
   const icons={fire:'🔥',lightning:'⚡',bomb:'💣'};
   ctx.fillText(icons[boss.skillType],iconX,iconY+1);
 
-  // 스킬 쿨다운 링 (얼마나 스킬이 찼는지 원형 게이지)
-  const fireP=boss.skillTimer/getSkillInterval(); // 0→1
+  // ── 스킬 쿨다운 링 ──
+  const fireP=boss.skillTimer/getSkillInterval();
   const ringR=W*0.5-2;
   ctx.strokeStyle='rgba(255,255,255,0.1)'; ctx.lineWidth=3;
-  ctx.beginPath(); ctx.arc(cx,cy,ringR,0,Math.PI*2); ctx.stroke(); // 빈 링
+  ctx.beginPath(); ctx.arc(cx,cy,ringR,0,Math.PI*2); ctx.stroke();
   ctx.strokeStyle=fireP>0.75?`rgba(255,80,0,${0.6+fireP*0.4})`:`${st.border}cc`;
   ctx.lineWidth=3;
-  // 쿨다운이 75% 이상 차면 빨갛게 강조
   ctx.beginPath(); ctx.arc(cx,cy,ringR,-Math.PI/2,-Math.PI/2+Math.PI*2*fireP); ctx.stroke();
 
-  // 이름 배지 (보스 위쪽에 작게 표시)
+  // ── 이름 배지 ──
   const label=st.label;
   const bw=label.length*6+10;
   ctx.fillStyle='rgba(0,0,0,0.82)'; roundRect(ctx,cx-bw/2,y-16,bw,13,4); ctx.fill();
