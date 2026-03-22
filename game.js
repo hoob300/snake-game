@@ -2250,7 +2250,8 @@ function setDir(x,y) {
     right: zone.querySelector('.sw-right'),
   };
   let startX = 0, startY = 0, swiping = false;
-  const THRESHOLD = 15; // 최소 스와이프 거리(px)
+  let lastSentDir = null;     // 마지막으로 전송한 방향 (중복 전송 방지)
+  const THRESHOLD = 12;       // 최소 스와이프 거리(px)
 
   function clearArrows() {
     Object.values(arrows).forEach(a => a.classList.remove('active'));
@@ -2261,8 +2262,8 @@ function setDir(x,y) {
     const t = e.touches[0];
     startX = t.clientX; startY = t.clientY;
     swiping = true;
+    lastSentDir = null;
     clearArrows();
-    // 트레일 중앙에 표시
     const rect = zone.getBoundingClientRect();
     trail.style.left = (t.clientX - rect.left) + 'px';
     trail.style.top  = (t.clientY - rect.top) + 'px';
@@ -2275,48 +2276,46 @@ function setDir(x,y) {
     const t = e.touches[0];
     const dx = t.clientX - startX;
     const dy = t.clientY - startY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
 
     // 트레일 위치 업데이트
     const rect = zone.getBoundingClientRect();
     trail.style.left = (t.clientX - rect.left) + 'px';
     trail.style.top  = (t.clientY - rect.top) + 'px';
 
-    // 방향 하이라이트 표시
+    // 데드존 내: 아무것도 하지 않음
+    if (dist < THRESHOLD) { clearArrows(); return; }
+
+    // 방향 판정
+    let newDir;
+    if (Math.abs(dx) > Math.abs(dy)) {
+      newDir = dx > 0 ? 'right' : 'left';
+    } else {
+      newDir = dy > 0 ? 'down' : 'up';
+    }
+
+    // 화살표 하이라이트
     clearArrows();
-    if (Math.abs(dx) > THRESHOLD || Math.abs(dy) > THRESHOLD) {
-      if (Math.abs(dx) > Math.abs(dy)) {
-        arrows[dx > 0 ? 'right' : 'left'].classList.add('active');
-      } else {
-        arrows[dy > 0 ? 'down' : 'up'].classList.add('active');
-      }
+    arrows[newDir].classList.add('active');
+
+    // 같은 방향이면 중복 전송하지 않음 (연속 스와이프 시 한 번만)
+    if (newDir !== lastSentDir) {
+      lastSentDir = newDir;
+      const dirMap = { up:[0,-1], down:[0,1], left:[-1,0], right:[1,0] };
+      setDir(dirMap[newDir][0], dirMap[newDir][1]);
     }
   });
 
-  zone.addEventListener('touchend', e => {
+  zone.addEventListener('touchend', () => {
     if (!swiping) return;
     swiping = false;
     trail.classList.remove('show');
 
-    const t = e.changedTouches[0];
-    const dx = t.clientX - startX;
-    const dy = t.clientY - startY;
-
-    if (Math.abs(dx) < THRESHOLD && Math.abs(dy) < THRESHOLD) {
-      // 짧은 탭 → 일시정지 토글
-      clearArrows();
-      togglePause();
-      return;
-    }
-
-    // 스와이프 방향으로 이동
-    if (Math.abs(dx) > Math.abs(dy)) setDir(dx > 0 ? 1 : -1, 0);
-    else setDir(0, dy > 0 ? 1 : -1);
-
-    // 0.3초 후 화살표 하이라이트 제거
-    setTimeout(clearArrows, 300);
+    // touchmove에서 이미 방향을 전송했으므로 touchend에서는 추가 처리 불필요
+    // 데드존 안에서 끝난 경우(탭)도 아무것도 하지 않음 (일시정지는 별도 버튼)
+    setTimeout(clearArrows, 200);
   });
 
-  // 터치 취소 시 정리
   zone.addEventListener('touchcancel', () => {
     swiping = false; trail.classList.remove('show'); clearArrows();
   });
