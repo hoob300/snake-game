@@ -90,6 +90,53 @@ const ENEMY_INTRO = {
   4:'방랑자 추가!', 5:'추격자 추가!', 6:'순간이동자 등장!',
 };
 
+// ── 필드 장애물(나무) 맵 ──────────────────────────────────────
+// 1 = 나무(벽), 0 = 빈 칸. 뱀·몹·먹이 모두 1인 칸에 놓일 수 없습니다.
+// 25×30 맵. 뱀 시작 위치(10,10) 주변은 반드시 비워둡니다.
+const OBSTACLES = (() => {
+  // 0으로 채운 2D 배열 생성 (ROWS행 × COLS열)
+  const map = [];
+  for (let r = 0; r < 30; r++) {
+    map[r] = [];
+    for (let c = 0; c < 25; c++) map[r][c] = 0;
+  }
+  // 나무 배치: 필드 곳곳에 2×2 크기 나무 덩어리를 놓습니다.
+  // 모서리/가장자리 나무 (숲 테두리 느낌)
+  const trees = [
+    // 좌상단 숲
+    [1,1], [2,1], [1,2], [2,2],
+    // 우상단 숲
+    [21,1], [22,1], [21,2], [22,2],
+    // 좌하단 숲
+    [1,26], [2,26], [1,27], [2,27],
+    // 우하단 숲
+    [21,26], [22,26], [21,27], [22,27],
+    // 중앙 상단 나무
+    [11,4], [12,4], [11,5], [12,5],
+    // 좌측 중앙 나무
+    [4,13], [5,13], [4,14], [5,14],
+    // 우측 중앙 나무
+    [19,13], [20,13], [19,14], [20,14],
+    // 중앙 하단 나무
+    [11,22], [12,22], [11,23], [12,23],
+    // 추가 작은 나무들
+    [7,8], [8,8],
+    [16,8], [17,8],
+    [7,20], [8,20],
+    [16,20], [17,20],
+  ];
+  trees.forEach(([c, r]) => {
+    if (r >= 0 && r < 30 && c >= 0 && c < 25) map[r][c] = 1;
+  });
+  return map;
+})();
+
+// 해당 좌표가 장애물(나무)인지 확인
+function onObstacle(p) {
+  if (p.x < 0 || p.x >= COLS || p.y < 0 || p.y >= ROWS) return false;
+  return OBSTACLES[p.y][p.x] === 1;
+}
+
 // ── 게임 초기화 ─────────────────────────────────────────────
 // 게임을 처음 시작하거나 다시 시작할 때 모든 변수를 초기 상태로 되돌립니다.
 function init() {
@@ -189,17 +236,17 @@ function onBoss(p, ex) {
 // 해당 칸에 아이템이 있는지 확인
 function onItem(p) { return fieldItems.some(it => it.x === p.x && it.y === p.y); }
 
-// 일반 먹이를 뱀·몹·보스·아이템이 없는 빈 칸에 랜덤 배치
+// 일반 먹이를 뱀·몹·보스·아이템·장애물이 없는 빈 칸에 랜덤 배치
 function placeFood() {
   let p;
-  do { p = randomCell(); } while (onSnake(p) || onEnemy(p,null) || onBoss(p,null) || onItem(p));
+  do { p = randomCell(); } while (onSnake(p) || onEnemy(p,null) || onBoss(p,null) || onItem(p) || onObstacle(p));
   food = p;
 }
 // 보너스 먹이(별) 배치. 80틱 후 사라집니다.
 function placeBonusFood() {
   let p;
   do { p = randomCell(); }
-  while (onSnake(p) || onEnemy(p,null) || onBoss(p,null) || onItem(p) || (p.x===food.x && p.y===food.y));
+  while (onSnake(p) || onEnemy(p,null) || onBoss(p,null) || onItem(p) || onObstacle(p) || (p.x===food.x && p.y===food.y));
   bonusFood = { ...p, timer:80 };
 }
 
@@ -223,7 +270,7 @@ function spawnEnemy(type) {
     // 2×2 영역의 4칸 모두 빈 칸이어야 합니다
     var cells = [{x:p.x,y:p.y},{x:p.x+1,y:p.y},{x:p.x,y:p.y+1},{x:p.x+1,y:p.y+1}];
   } while (att<300 && cells.some(c =>
-    onSnake(c)||distToHead(c)<6||onEnemy(c,null)||onBoss(c,null)||onItem(c)||(c.x===food.x&&c.y===food.y)
+    onSnake(c)||distToHead(c)<6||onEnemy(c,null)||onBoss(c,null)||onItem(c)||onObstacle(c)||(c.x===food.x&&c.y===food.y)
   ));
   const dirs4=[{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}];
   const d=dirs4[Math.floor(Math.random()*4)];
@@ -276,7 +323,7 @@ function spawnBoss(idx) {
     att++;
   } while (att<400 && (
     distToHead(p)<10 || // 뱀 머리에서 너무 가까우면 다시 시도
-    bossOccupies(p).some(c => onSnake(c)||onEnemy(c,null)||onBoss(c,null)||(c.x===food.x&&c.y===food.y))
+    bossOccupies(p).some(c => onSnake(c)||onEnemy(c,null)||onBoss(c,null)||onObstacle(c)||(c.x===food.x&&c.y===food.y))
   ));
   const dirs4=[{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}];
   const d=dirs4[Math.floor(Math.random()*4)]; // 랜덤 초기 이동 방향
@@ -299,13 +346,15 @@ function moveBoss3x3(boss) {
     const d=dirs4[Math.floor(Math.random()*4)];
     boss.dx=d.x; boss.dy=d.y;
   }
+  // 보스 3×3이 이동 가능한지 확인 (경계 + 장애물)
+  function bossCanMove(bx, by) {
+    if (bx<0||bx+2>=COLS||by<0||by+2>=ROWS) return false;
+    for (let dy=0;dy<3;dy++) for (let dx=0;dx<3;dx++) if (onObstacle({x:bx+dx,y:by+dy})) return false;
+    return true;
+  }
   const nx=boss.x+boss.dx, ny=boss.y+boss.dy;
-  // 3×3 크기이므로 x+2, y+2 까지 게임판 안에 있어야 합니다.
-  if (nx<0||nx+2>=COLS||ny<0||ny+2>=ROWS) {
-    const opts=dirs4.filter(d=>{
-      const bx=boss.x+d.x, by=boss.y+d.y;
-      return bx>=0&&bx+2<COLS&&by>=0&&by+2<ROWS;
-    });
+  if (!bossCanMove(nx, ny)) {
+    const opts=dirs4.filter(d => bossCanMove(boss.x+d.x, boss.y+d.y));
     if (opts.length) {
       const d=opts[Math.floor(Math.random()*opts.length)];
       boss.dx=d.x; boss.dy=d.y;
@@ -446,9 +495,12 @@ function moveEnemies() {
   });
 }
 
-// 2×2 몹이 게임판 안에 있는지 확인 (좌상단 좌표 기준)
+// 2×2 몹이 이동 가능한지 확인 (경계 + 장애물)
 function enemyInBounds(ex, ey) {
-  return ex >= 0 && ex + 1 < COLS && ey >= 0 && ey + 1 < ROWS;
+  if (ex < 0 || ex + 1 >= COLS || ey < 0 || ey + 1 >= ROWS) return false;
+  // 2×2 영역의 4칸이 모두 장애물이 아닌지 확인
+  return !onObstacle({x:ex,y:ey}) && !onObstacle({x:ex+1,y:ey})
+      && !onObstacle({x:ex,y:ey+1}) && !onObstacle({x:ex+1,y:ey+1});
 }
 
 // 방랑자(wanderer): 25% 확률로 방향 전환, 벽에 닿으면 다른 방향으로
@@ -490,7 +542,12 @@ function moveTeleporter(e) {
   e.teleTimer++;
   if (e.teleTimer>=22) {
     let p, att=0;
-    do { p=randomCell(); att++; } while (att<150&&(onSnake(p)||distToHead(p)<3||onEnemy(p,e)));
+    do {
+      p = { x: Math.floor(Math.random()*(COLS-1)), y: Math.floor(Math.random()*(ROWS-1)) };
+      att++;
+    } while (att<150 && (
+      !enemyInBounds(p.x, p.y) || onSnake(p) || distToHead(p)<3 || onEnemy(p,e)
+    ));
     e.x=p.x; e.y=p.y; e.teleTimer=0;
   }
 }
@@ -535,22 +592,23 @@ function tick() {
   // 뱀 머리의 다음 위치 계산
   const head = { x:snake[0].x+dir.x, y:snake[0].y+dir.y };
 
-  // 벽에 닿으면 죽는 대신 수직 방향으로 랜덤하게 꺾습니다.
-  if (head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS) {
-    // 현재 이동 방향의 수직 방향 2가지를 선택지로 만들기
+  // 벽 또는 장애물에 닿으면 수직 방향으로 랜덤하게 꺾습니다.
+  // isBlocked: 게임판 밖이거나 나무 장애물이면 true
+  function isBlocked(p) {
+    return p.x < 0 || p.x >= COLS || p.y < 0 || p.y >= ROWS || onObstacle(p);
+  }
+  if (isBlocked(head)) {
     const perps = dir.x !== 0
-      ? [{x:0,y:-1},{x:0,y:1}]   // 가로 이동 중 → 위/아래로 전환
-      : [{x:-1,y:0},{x:1,y:0}];  // 세로 이동 중 → 좌/우로 전환
-    const pick = Math.floor(Math.random()*2); // 0 또는 1 랜덤 선택
+      ? [{x:0,y:-1},{x:0,y:1}]
+      : [{x:-1,y:0},{x:1,y:0}];
+    const pick = Math.floor(Math.random()*2);
     let nd = perps[pick];
     let nh = { x: snake[0].x + nd.x, y: snake[0].y + nd.y };
-    // 선택한 방향도 벽이면 반대 방향 시도
-    if (nh.x < 0 || nh.x >= COLS || nh.y < 0 || nh.y >= ROWS) {
+    if (isBlocked(nh)) {
       nd = perps[1-pick];
       nh = { x: snake[0].x + nd.x, y: snake[0].y + nd.y };
     }
-    // 양쪽 다 막힌 극단적 코너 상황이면 이번 틱 이동 건너뜀
-    if (nh.x < 0 || nh.x >= COLS || nh.y < 0 || nh.y >= ROWS) return;
+    if (isBlocked(nh)) return; // 양쪽 다 막힘
     dir = nd; nextDir = nd;
     head.x = nh.x; head.y = nh.y;
   }
@@ -691,15 +749,7 @@ function drawClouds() {
 }
 
 function draw() {
-  // 배경: 밝은 하늘색 바다 그라데이션 (#4EC5F1 위 → #87CEEB 아래)
-  const skyGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  skyGrad.addColorStop(0, '#4EC5F1'); // 위쪽: 진한 하늘색
-  skyGrad.addColorStop(1, '#87CEEB'); // 아래쪽: 연한 하늘색
-  ctx.fillStyle = skyGrad;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  drawClouds();          // 바다 배경 위에 구름 장식
-  drawGrid();            // 초록 잔디 체커보드 격자
+  drawGrid();            // 숲 바닥 + 나무 장애물 + 벽
   drawFood();            // 일반 먹이 (빨간 사과)
   if (bonusFood) drawBonusFood(); // 보너스 먹이 (황금 별)
   drawPendingEffects();  // 번개 경고·낙뢰·폭탄 날아가기·불타기
@@ -714,29 +764,132 @@ function draw() {
   drawToasts();          // 토스트 그리기
 }
 
-// 초록 체커보드 잔디 패턴 + 갈색 흙 테두리를 그립니다.
+// ── 숲 스타일 필드 + 나무 장애물 + 벽 그리기 ──────────────────
+// 이미지 참고: 짙은 초록 잔디 바닥 + 중간에 꽃/풀 장식 + 나무 벽
+// 꽃/풀 장식 위치를 미리 생성 (매 프레임 랜덤하면 깜빡이므로)
+const GRASS_DECOR = (() => {
+  const decor = [];
+  // 장애물이 아닌 칸에만 랜덤하게 풀/꽃 배치 (시드 기반)
+  for (let r = 0; r < 30; r++) {
+    for (let c = 0; c < 25; c++) {
+      if (OBSTACLES[r][c]) continue;
+      const hash = (c * 7 + r * 13) % 17; // 간단한 의사 랜덤
+      if (hash < 2) {
+        // 작은 꽃 (파란색/노란색)
+        decor.push({ x: c, y: r, type: 'flower', color: hash === 0 ? '#7EC8E3' : '#FFD54F' });
+      } else if (hash === 3) {
+        // 풀잎 장식
+        decor.push({ x: c, y: r, type: 'grass' });
+      }
+    }
+  }
+  return decor;
+})();
+
 function drawGrid() {
-  // 체커보드 잔디: 밝은 초록 / 진한 초록 칸이 번갈아 나옵니다.
+  // ── 바닥: 짙은 초록 잔디 (체커보드 패턴) ──
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
-      // 짝수 칸은 밝은 초록, 홀수 칸은 진한 초록
-      ctx.fillStyle = (r + c) % 2 === 0 ? '#7EC850' : '#6BB53D';
+      if (OBSTACLES[r][c]) continue; // 장애물 칸은 나중에 따로 그림
+      // 어두운 초록 체커보드 (숲 바닥 느낌)
+      ctx.fillStyle = (r + c) % 2 === 0 ? '#4A7A2E' : '#3D6B25';
       ctx.fillRect(c * CELL, r * CELL, CELL, CELL);
     }
   }
 
-  // 갈색 흙 테두리 (약간 3D 느낌: 위/왼쪽은 밝고 아래/오른쪽은 어둡게)
-  const bw = 3; // 테두리 두께(px)
-  // 위쪽 테두리 (밝은 갈색)
-  ctx.fillStyle = '#A0724A';
+  // ── 풀/꽃 장식 (바닥 위에 작은 디테일) ──
+  GRASS_DECOR.forEach(d => {
+    const px = d.x * CELL, py = d.y * CELL;
+    const cx = px + CELL / 2, cy = py + CELL / 2;
+    if (d.type === 'flower') {
+      // 작은 꽃 (줄기 + 꽃잎)
+      ctx.strokeStyle = '#2E7D32'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(cx, cy + 4); ctx.lineTo(cx, cy - 1); ctx.stroke();
+      ctx.fillStyle = d.color;
+      ctx.beginPath(); ctx.arc(cx, cy - 2, 2.5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#FFF9C4';
+      ctx.beginPath(); ctx.arc(cx, cy - 2, 1, 0, Math.PI * 2); ctx.fill();
+    } else {
+      // 풀잎 2~3개
+      ctx.strokeStyle = '#388E3C'; ctx.lineWidth = 1.2; ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(cx - 2, cy + 3); ctx.quadraticCurveTo(cx - 3, cy - 2, cx - 1, cy - 4);
+      ctx.moveTo(cx + 1, cy + 3); ctx.quadraticCurveTo(cx + 3, cy - 1, cx + 2, cy - 3);
+      ctx.stroke();
+    }
+  });
+
+  // ── 나무 장애물 그리기 ──
+  // 장애물 칸마다 나무 그래픽을 그립니다 (2×2 블록이 모여서 큰 나무 형태)
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (!OBSTACLES[r][c]) continue;
+      const px = c * CELL, py = r * CELL;
+      const cx = px + CELL / 2, cy = py + CELL / 2;
+
+      // 나무 그루터기 (갈색 기둥)
+      ctx.fillStyle = '#5D4037';
+      roundRect(ctx, px + 3, py + 2, CELL - 6, CELL - 2, 3); ctx.fill();
+      // 그루터기 밝은 면
+      ctx.fillStyle = '#795548';
+      roundRect(ctx, px + 4, py + 3, CELL - 10, CELL - 5, 2); ctx.fill();
+
+      // 나뭇잎 윗부분 (짙은 초록 둥근 구체)
+      const leafR = CELL * 0.6;
+      const leafGrd = ctx.createRadialGradient(cx - 2, cy - 4, 1, cx, cy - 2, leafR);
+      leafGrd.addColorStop(0, '#43A047');   // 밝은 초록
+      leafGrd.addColorStop(0.6, '#2E7D32'); // 중간 초록
+      leafGrd.addColorStop(1, '#1B5E20');   // 어두운 초록
+      ctx.fillStyle = leafGrd;
+      ctx.beginPath(); ctx.arc(cx, cy - 2, leafR, 0, Math.PI * 2); ctx.fill();
+
+      // 나뭇잎 하이라이트
+      ctx.fillStyle = 'rgba(129,199,132,0.4)';
+      ctx.beginPath();
+      ctx.ellipse(cx - 2, cy - 5, leafR * 0.35, leafR * 0.2, -0.3, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 나뭇잎 테두리
+      ctx.strokeStyle = '#1B5E20';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(cx, cy - 2, leafR, 0, Math.PI * 2); ctx.stroke();
+    }
+  }
+
+  // ── 벽 (필드 가장자리에 덤불/나무 울타리) ──
+  const bw = 4; // 벽 두께(px)
+  // 위쪽 벽 (짙은 초록 덤불)
+  const topGrd = ctx.createLinearGradient(0, 0, 0, bw * 2);
+  topGrd.addColorStop(0, '#1B5E20');
+  topGrd.addColorStop(1, '#2E7D32');
+  ctx.fillStyle = topGrd;
   ctx.fillRect(0, 0, canvas.width, bw);
-  // 왼쪽 테두리 (밝은 갈색)
+  // 왼쪽 벽
+  const leftGrd = ctx.createLinearGradient(0, 0, bw * 2, 0);
+  leftGrd.addColorStop(0, '#1B5E20');
+  leftGrd.addColorStop(1, '#2E7D32');
+  ctx.fillStyle = leftGrd;
   ctx.fillRect(0, 0, bw, canvas.height);
-  // 아래쪽 테두리 (어두운 갈색)
-  ctx.fillStyle = '#6B4226';
+  // 아래쪽 벽
+  ctx.fillStyle = '#1B5E20';
   ctx.fillRect(0, canvas.height - bw, canvas.width, bw);
-  // 오른쪽 테두리 (어두운 갈색)
+  // 오른쪽 벽
   ctx.fillRect(canvas.width - bw, 0, bw, canvas.height);
+
+  // 벽에 덤불 디테일 (위쪽과 아래쪽)
+  for (let i = 0; i < COLS; i++) {
+    // 위쪽 덤불
+    const bx = i * CELL + CELL / 2;
+    if (i % 2 === 0) {
+      ctx.fillStyle = '#2E7D32';
+      ctx.beginPath(); ctx.arc(bx, 2, 6, 0, Math.PI * 2); ctx.fill();
+    }
+    // 아래쪽 덤불
+    if (i % 2 === 1) {
+      ctx.fillStyle = '#2E7D32';
+      ctx.beginPath(); ctx.arc(bx, canvas.height - 2, 6, 0, Math.PI * 2); ctx.fill();
+    }
+  }
 }
 
 // ── 뱀 그리기 ───────────────────────────────────────────────
@@ -1778,7 +1931,7 @@ function spawnFieldItem() {
   let p, att = 0;
   do { p = randomCell(); att++; }
   while (att < 200 && (
-    onSnake(p) || onEnemy(p, null) || onBoss(p, null) ||
+    onSnake(p) || onEnemy(p, null) || onBoss(p, null) || onObstacle(p) ||
     (p.x === food.x && p.y === food.y) ||
     fieldItems.some(it => it.x === p.x && it.y === p.y)
   ));
