@@ -10,7 +10,7 @@ const canvas = document.getElementById('game-canvas');
 const ctx    = canvas.getContext('2d');
 
 // 가로 20칸, 세로 20칸 격자로 게임판을 나눕니다.
-const COLS = 25, ROWS = 30;
+const COLS = 16, ROWS = 20;
 // 한 칸의 픽셀 크기 (캔버스 폭 ÷ 칸 수 = 20px)
 const CELL = canvas.width / COLS;
 
@@ -93,18 +93,16 @@ const ENEMY_INTRO = {
 // ── 필드 장애물(나무) 맵 ─────────────────────────────────────
 // 2 = 벽 나무(테두리), 1 = 필드 내 나무, 0 = 빈 칸
 // 뱀·몹·먹이 모두 0이 아닌 칸에 놓일 수 없습니다.
-// 25×30 맵. 뱀 시작 위치(10,10) 주변은 반드시 비워둡니다.
+// 16×20 맵. 뱀 시작 위치(7,10) 주변은 반드시 비워둡니다.
 const OBSTACLES = (() => {
-  // 0으로 채운 2D 배열 생성 (ROWS행 × COLS열)
   const map = [];
-  for (let r = 0; r < 30; r++) {
+  for (let r = 0; r < ROWS; r++) {
     map[r] = [];
-    for (let c = 0; c < 25; c++) map[r][c] = 0;
+    for (let c = 0; c < COLS; c++) map[r][c] = 0;
   }
   // 벽 전체를 나무로 채우기 (테두리 1줄 = 값 2)
-  for (let c = 0; c < 25; c++) { map[0][c] = 2; map[29][c] = 2; } // 위·아래
-  for (let r = 0; r < 30; r++) { map[r][0] = 2; map[r][24] = 2; } // 왼·오른쪽
-  // 필드 중간 나무 없음 (깔끔한 필드)
+  for (let c = 0; c < COLS; c++) { map[0][c] = 2; map[ROWS - 1][c] = 2; }
+  for (let r = 0; r < ROWS; r++) { map[r][0] = 2; map[r][COLS - 1] = 2; }
   return map;
 })();
 
@@ -118,7 +116,7 @@ function onObstacle(p) {
 // 게임을 처음 시작하거나 다시 시작할 때 모든 변수를 초기 상태로 되돌립니다.
 function init() {
   // 뱀을 게임판 중앙(10,10)에 오른쪽 방향으로 3칸 길이로 배치
-  snake       = [{ x:10,y:10 },{ x:9,y:10 },{ x:8,y:10 }];
+  snake       = [{ x:7,y:10 },{ x:6,y:10 },{ x:5,y:10 }];
   prevSnake   = snake.map(s => ({...s})); // 보간용 이전 위치 복사
   dir         = { x:1,y:0 }; // 오른쪽 이동
   nextDir     = { x:1,y:0 };
