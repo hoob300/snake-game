@@ -54,19 +54,22 @@
       </div>
     </div>
 
-    <!-- 모바일 D-패드 + 아이템 버튼 -->
+    <!-- 모바일 스와이프 컨트롤러 + 아이템 버튼 -->
     <div class="controls">
-      <div class="dpad">
-        <button class="dpad-btn" id="btn-up" aria-label="위">▲</button>
-        <div class="dpad-row">
-          <button class="dpad-btn" id="btn-left" aria-label="왼쪽">◀</button>
-          <button class="dpad-btn center" id="btn-pause" aria-label="일시정지">⏸</button>
-          <button class="dpad-btn" id="btn-right" aria-label="오른쪽">▶</button>
+      <div class="swipe-zone" id="swipe-zone">
+        <div class="swipe-arrows">
+          <span class="sw-arrow sw-up">▲</span>
+          <span class="sw-arrow sw-left">◀</span>
+          <span class="sw-arrow sw-right">▶</span>
+          <span class="sw-arrow sw-down">▼</span>
         </div>
-        <button class="dpad-btn" id="btn-down" aria-label="아래">▼</button>
+        <div class="swipe-label">SWIPE</div>
+        <!-- 스와이프 방향 피드백 표시 -->
+        <div class="swipe-trail" id="swipe-trail"></div>
       </div>
-      <!-- 아이템 사용 버튼 + 인벤토리 슬롯 표시 -->
+      <!-- 아이템 + 일시정지 -->
       <div class="item-panel">
+        <button class="dpad-btn" id="btn-pause" aria-label="일시정지">⏸</button>
         <button class="dpad-btn item-btn" id="btn-item" aria-label="아이템 사용">🎒</button>
         <div class="inventory-slots" id="inventory-slots">
           <span class="inv-slot empty">·</span>

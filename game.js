@@ -2228,14 +2228,10 @@ document.addEventListener('keydown', e=>{
   if(running) { clearInterval(loopId); tick(); loopId=setInterval(tick,speed); }
 });
 
-// 화면 D-패드 버튼 클릭 처리
-document.getElementById('btn-up').addEventListener('click',    ()=>setDir(0,-1));
-document.getElementById('btn-down').addEventListener('click',  ()=>setDir(0,1));
-document.getElementById('btn-left').addEventListener('click',  ()=>setDir(-1,0));
-document.getElementById('btn-right').addEventListener('click', ()=>setDir(1,0));
+// 일시정지 버튼
 document.getElementById('btn-pause').addEventListener('click', togglePause);
 
-// 방향 설정 공통 함수 (D-패드 버튼용)
+// 방향 설정 공통 함수
 function setDir(x,y) {
   if(x===-dir.x&&y===-dir.y) return; // 역방향 무시
   nextDir={x,y};
@@ -2243,15 +2239,97 @@ function setDir(x,y) {
   if(running) { clearInterval(loopId); tick(); loopId=setInterval(tick,speed); }
 }
 
-// 캔버스 터치 스와이프로 방향 전환 (모바일용)
+// ── 스와이프 제스처 컨트롤러 (모바일) ──────────────────────
+(() => {
+  const zone = document.getElementById('swipe-zone');
+  const trail = document.getElementById('swipe-trail');
+  const arrows = {
+    up:    zone.querySelector('.sw-up'),
+    down:  zone.querySelector('.sw-down'),
+    left:  zone.querySelector('.sw-left'),
+    right: zone.querySelector('.sw-right'),
+  };
+  let startX = 0, startY = 0, swiping = false;
+  const THRESHOLD = 15; // 최소 스와이프 거리(px)
+
+  function clearArrows() {
+    Object.values(arrows).forEach(a => a.classList.remove('active'));
+  }
+
+  zone.addEventListener('touchstart', e => {
+    e.preventDefault();
+    const t = e.touches[0];
+    startX = t.clientX; startY = t.clientY;
+    swiping = true;
+    clearArrows();
+    // 트레일 중앙에 표시
+    const rect = zone.getBoundingClientRect();
+    trail.style.left = (t.clientX - rect.left) + 'px';
+    trail.style.top  = (t.clientY - rect.top) + 'px';
+    trail.classList.add('show');
+  });
+
+  zone.addEventListener('touchmove', e => {
+    if (!swiping) return;
+    e.preventDefault();
+    const t = e.touches[0];
+    const dx = t.clientX - startX;
+    const dy = t.clientY - startY;
+
+    // 트레일 위치 업데이트
+    const rect = zone.getBoundingClientRect();
+    trail.style.left = (t.clientX - rect.left) + 'px';
+    trail.style.top  = (t.clientY - rect.top) + 'px';
+
+    // 방향 하이라이트 표시
+    clearArrows();
+    if (Math.abs(dx) > THRESHOLD || Math.abs(dy) > THRESHOLD) {
+      if (Math.abs(dx) > Math.abs(dy)) {
+        arrows[dx > 0 ? 'right' : 'left'].classList.add('active');
+      } else {
+        arrows[dy > 0 ? 'down' : 'up'].classList.add('active');
+      }
+    }
+  });
+
+  zone.addEventListener('touchend', e => {
+    if (!swiping) return;
+    swiping = false;
+    trail.classList.remove('show');
+
+    const t = e.changedTouches[0];
+    const dx = t.clientX - startX;
+    const dy = t.clientY - startY;
+
+    if (Math.abs(dx) < THRESHOLD && Math.abs(dy) < THRESHOLD) {
+      // 짧은 탭 → 일시정지 토글
+      clearArrows();
+      togglePause();
+      return;
+    }
+
+    // 스와이프 방향으로 이동
+    if (Math.abs(dx) > Math.abs(dy)) setDir(dx > 0 ? 1 : -1, 0);
+    else setDir(0, dy > 0 ? 1 : -1);
+
+    // 0.3초 후 화살표 하이라이트 제거
+    setTimeout(clearArrows, 300);
+  });
+
+  // 터치 취소 시 정리
+  zone.addEventListener('touchcancel', () => {
+    swiping = false; trail.classList.remove('show'); clearArrows();
+  });
+})();
+
+// 캔버스 터치 스와이프도 유지 (캔버스 직접 스와이프)
 let touchStart=null;
 canvas.addEventListener('touchstart', e=>{ touchStart=e.touches[0]; }, {passive:true});
 canvas.addEventListener('touchend', e=>{
   if(!touchStart) return;
-  const dx=e.changedTouches[0].clientX-touchStart.clientX; // 가로 스와이프 거리
-  const dy=e.changedTouches[0].clientY-touchStart.clientY; // 세로 스와이프 거리
-  if(Math.abs(dx)<10&&Math.abs(dy)<10) return; // 너무 짧은 터치는 무시
-  // 가로·세로 중 더 긴 방향으로 이동
+  const dx=e.changedTouches[0].clientX-touchStart.clientX;
+  const dy=e.changedTouches[0].clientY-touchStart.clientY;
+  if(Math.abs(dx)<15&&Math.abs(dy)<15) return;
   if(Math.abs(dx)>Math.abs(dy)) setDir(dx>0?1:-1, 0);
   else setDir(0, dy>0?1:-1);
   touchStart=null;
