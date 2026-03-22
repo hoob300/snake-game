@@ -2354,7 +2354,7 @@ async function getRankings() {
     .from('rankings')
     .select('name, score, created_at')
     .order('score', { ascending: false })
-    .limit(3);
+    .limit(10);
   if (error) { console.error('랭킹 조회 오류:', error.message); return []; }
   return data.map(r => ({
     name: r.name,
@@ -2399,7 +2399,18 @@ async function renderRankings() {
       <div class="podium-bar">${idx+1}</div>
     </div>`;
   }).join('');
-  rankingList.innerHTML = `<div class="podium">${slots}</div>`;
+  // 4~10위 리스트
+  const rest = r.slice(3);
+  const listHtml = rest.length ? rest.map((item, i) => `
+    <div class="rank-item">
+      <div class="rank-badge num">${i + 4}위</div>
+      <div class="rank-info">
+        <div class="rank-name">${escHtml(item.name)}</div>
+        <div class="rank-date">${item.date || ''}</div>
+      </div>
+      <div class="rank-score">${item.score.toLocaleString()}</div>
+    </div>`).join('') : '';
+  rankingList.innerHTML = `<div class="podium">${slots}</div>${listHtml ? '<div class="rank-rest">' + listHtml + '</div>' : ''}`;
 }
 
 // HTML 특수문자를 안전하게 변환합니다. (XSS 방지)
