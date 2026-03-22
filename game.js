@@ -744,16 +744,12 @@ function drawSnake() {
     y: s.y * CELL + CELL / 2,
   }));
 
-  // ── 몸통 두께: 전체 동일, 꼬리 1칸만 줄어듬 ──
+  // ── 몸통 두께: 머리부터 꼬리까지 완전 동일 ──
   const W = CELL * 0.82;          // 몸통 균일 두께
-  const tailW = CELL * 0.38;      // 꼬리 끝 두께
 
-  // 꼬리 마지막 1마디만 두께가 줄어듭니다
-  function widthAt(i) {
-    if (pts.length <= 1) return W;
-    if (i === pts.length - 1) return tailW;           // 꼬리 끝
-    if (i === pts.length - 2) return (W + tailW) / 2; // 꼬리 직전 (부드러운 전환)
-    return W; // 나머지 몸통은 동일 두께
+  // 모든 마디가 동일한 두께입니다 (꼬리 끝은 별도로 둥글게 그림)
+  function widthAt() {
+    return W;
   }
 
   // ── 뱀 색상: 진한 초록 기반 ──
@@ -999,7 +995,7 @@ function drawSnake() {
     const tDir = { x: tdx / tLen, y: tdy / tLen };
 
     // 둥근 끝 (초록 그라데이션)
-    const tR = tailW * 0.5;
+    const tR = W * 0.45;
     const tipX = tail.x + tDir.x * tR * 0.3; // 약간 끝 방향으로 이동
     const tipY = tail.y + tDir.y * tR * 0.3;
     const tGrd = ctx.createRadialGradient(tipX - 1, tipY - 1, 0, tipX, tipY, tR);
