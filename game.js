@@ -753,126 +753,124 @@ function draw() {
 // ── 숲 스타일 필드 + 나무 장애물 + 나무 벽 그리기 ──────────────
 
 function drawGrid() {
-  // ── 바닥: 밝은 단일 색상 잔디 ──
-  ctx.fillStyle = '#7EC850'; // 밝고 깨끗한 초록색
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // ── 바닥: 초록 체커보드 패턴 (초기 디자인) ──
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (OBSTACLES[r][c]) continue; // 장애물 칸은 나중에 따로 그림
+      ctx.fillStyle = (r + c) % 2 === 0 ? '#4A7A2E' : '#3D6B25';
+      ctx.fillRect(c * CELL, r * CELL, CELL, CELL);
+    }
+  }
 
   // ── 벽 풀숲(부시) 그리기 (OBSTACLES 값 2) ──
-  // 이미지처럼 둥글둥글한 초록 풀숲으로 테두리를 채웁니다
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
       if (OBSTACLES[r][c] !== 2) continue;
       const px = c * CELL, py = r * CELL;
       const cx = px + CELL / 2, cy = py + CELL / 2;
 
-      // 풀숲 바탕 (짙은 초록 사각형)
+      // 풀숲 바탕
       ctx.fillStyle = '#2E7D32';
       ctx.fillRect(px, py, CELL, CELL);
 
-      // 메인 풀숲 구체 (둥글고 볼록한 부시)
+      // 둥근 부시 구체
       const bushR = CELL * 0.58;
       const grd = ctx.createRadialGradient(cx - 2, cy - 2, 2, cx, cy, bushR);
-      grd.addColorStop(0, '#66BB6A');   // 밝은 연두 (하이라이트)
-      grd.addColorStop(0.4, '#43A047'); // 중간 초록
-      grd.addColorStop(0.8, '#2E7D32'); // 짙은 초록
-      grd.addColorStop(1, '#1B5E20');   // 가장 어두운 테두리
+      grd.addColorStop(0, '#66BB6A');
+      grd.addColorStop(0.4, '#43A047');
+      grd.addColorStop(0.8, '#2E7D32');
+      grd.addColorStop(1, '#1B5E20');
       ctx.fillStyle = grd;
       ctx.beginPath(); ctx.arc(cx, cy, bushR, 0, Math.PI * 2); ctx.fill();
 
-      // 풀숲 위에 작은 볼록 디테일 (입체감 — 잎사귀 뭉치 느낌)
-      const hash = (c * 7 + r * 11) % 5; // 셀마다 약간 다른 패턴
+      // 볼록 하이라이트
+      const hash = (c * 7 + r * 11) % 5;
       ctx.fillStyle = 'rgba(129,199,132,0.4)';
       ctx.beginPath();
       ctx.arc(cx - 3 + hash, cy - 3, bushR * 0.3, 0, Math.PI * 2);
       ctx.fill();
 
-      // 풀숲 테두리 (살짝 어두운 외곽선)
+      // 테두리
       ctx.strokeStyle = '#1B5E20'; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.arc(cx, cy, bushR, 0, Math.PI * 2); ctx.stroke();
     }
   }
 
-  // ── 필드 내 나무 그루터기 그리기 (OBSTACLES 값 1) ──
-  // 이미지처럼 잘린 나무 그루터기 + 뿌리가 보이는 디자인
+  // ── 필드 내 나무 그리기 (OBSTACLES 값 1) ──
+  // 이미지 참고: 둥근 수관(여러 겹 초록) + 갈색 줄기 + 뿌리
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
       if (OBSTACLES[r][c] !== 1) continue;
       const px = c * CELL, py = r * CELL;
-      const cx = px + CELL / 2, cy = py + CELL / 2;
+      const cx = px + CELL / 2;
 
-      // 그림자 (그루터기 아래 반투명 타원)
-      ctx.fillStyle = 'rgba(0,0,0,0.18)';
+      // ── 뿌리 (땅 위로 살짝 보이는 갈색 뿌리) ──
+      ctx.fillStyle = '#5D4037'; ctx.strokeStyle = '#4E342E';
+      ctx.lineWidth = 1.5; ctx.lineCap = 'round';
+      // 왼쪽 뿌리 (두꺼운 곡선)
       ctx.beginPath();
-      ctx.ellipse(cx, py + CELL - 1, CELL * 0.45, 3, 0, 0, Math.PI * 2);
+      ctx.moveTo(cx - 3, py + CELL - 3);
+      ctx.quadraticCurveTo(cx - 7, py + CELL - 1, cx - 9, py + CELL + 1);
+      ctx.lineTo(cx - 7, py + CELL + 1);
+      ctx.quadraticCurveTo(cx - 5, py + CELL - 1, cx - 2, py + CELL - 4);
       ctx.fill();
-
-      // 뿌리 (아래쪽으로 뻗어나가는 갈색 뿌리)
-      ctx.strokeStyle = '#5D4037'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
-      ctx.beginPath();
-      // 왼쪽 뿌리
-      ctx.moveTo(cx - 4, cy + 5);
-      ctx.quadraticCurveTo(cx - 7, cy + 8, cx - 8, py + CELL + 1);
       // 오른쪽 뿌리
-      ctx.moveTo(cx + 4, cy + 5);
-      ctx.quadraticCurveTo(cx + 7, cy + 8, cx + 8, py + CELL + 1);
-      // 중앙 뿌리
-      ctx.moveTo(cx, cy + 6);
-      ctx.lineTo(cx, py + CELL);
-      ctx.stroke();
-      // 가는 뿌리 추가
-      ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.moveTo(cx - 2, cy + 6);
-      ctx.quadraticCurveTo(cx - 5, cy + 9, cx - 5, py + CELL);
-      ctx.moveTo(cx + 2, cy + 6);
-      ctx.quadraticCurveTo(cx + 5, cy + 9, cx + 5, py + CELL);
-      ctx.stroke();
+      ctx.moveTo(cx + 3, py + CELL - 3);
+      ctx.quadraticCurveTo(cx + 7, py + CELL - 1, cx + 9, py + CELL + 1);
+      ctx.lineTo(cx + 7, py + CELL + 1);
+      ctx.quadraticCurveTo(cx + 5, py + CELL - 1, cx + 2, py + CELL - 4);
+      ctx.fill();
 
-      // 그루터기 몸통 (갈색 원기둥)
-      ctx.fillStyle = '#6D4C41';
-      roundRect(ctx, cx - 6, cy - 2, 12, 10, 3); ctx.fill();
-      // 몸통 어두운 면 (왼쪽)
+      // ── 줄기 (짧고 굵은 갈색 기둥) ──
       ctx.fillStyle = '#5D4037';
-      roundRect(ctx, cx - 6, cy - 2, 4, 10, 2); ctx.fill();
-      // 몸통 밝은 면 (오른쪽)
-      ctx.fillStyle = '#8D6E63';
-      roundRect(ctx, cx + 1, cy - 1, 4, 8, 2); ctx.fill();
+      roundRect(ctx, cx - 4, py + 8, 8, CELL - 8, 2); ctx.fill();
+      // 줄기 밝은 면 (나무껍질 질감)
+      ctx.fillStyle = '#795548';
+      roundRect(ctx, cx - 2, py + 9, 3, CELL - 10, 1); ctx.fill();
+      // 줄기 어두운 면
+      ctx.fillStyle = '#4E342E';
+      ctx.fillRect(cx + 2, py + 9, 1.5, CELL - 10);
 
-      // 그루터기 윗면 (잘린 나무 단면 — 나이테)
-      // 바깥 원 (어두운 갈색)
-      ctx.fillStyle = '#8D6E63';
-      ctx.beginPath();
-      ctx.ellipse(cx, cy - 2, 7, 4.5, 0, 0, Math.PI * 2);
-      ctx.fill();
-      // 나이테 — 중간 링
-      ctx.fillStyle = '#A1887F';
-      ctx.beginPath();
-      ctx.ellipse(cx, cy - 2, 5, 3, 0, 0, Math.PI * 2);
-      ctx.fill();
-      // 나이테 — 안쪽 링
-      ctx.fillStyle = '#BCAAA4';
-      ctx.beginPath();
-      ctx.ellipse(cx, cy - 2, 3, 2, 0, 0, Math.PI * 2);
-      ctx.fill();
-      // 나이테 — 중심점
-      ctx.fillStyle = '#D7CCC8';
-      ctx.beginPath();
-      ctx.arc(cx, cy - 2, 1.2, 0, Math.PI * 2);
-      ctx.fill();
-      // 윗면 테두리
-      ctx.strokeStyle = '#5D4037'; ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.ellipse(cx, cy - 2, 7, 4.5, 0, 0, Math.PI * 2);
-      ctx.stroke();
+      // ── 수관: 3겹 둥근 잎사귀 뭉치 (아래→위 점점 밝아짐) ──
+      // 이미지처럼 둥근 구체가 여러 겹 겹쳐서 풍성한 나무 형태
 
-      // 작은 풀 (그루터기 주변 잔디)
-      ctx.strokeStyle = '#66BB6A'; ctx.lineWidth = 1.5; ctx.lineCap = 'round';
+      // 1층 (가장 아래, 가장 어두운 초록) — 넓게
+      ctx.fillStyle = '#1B5E20';
+      ctx.beginPath(); ctx.arc(cx, py + 8, 9, 0, Math.PI * 2); ctx.fill();
+      // 왼쪽·오른쪽 잎 뭉치
+      ctx.beginPath(); ctx.arc(cx - 5, py + 7, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx + 5, py + 7, 6, 0, Math.PI * 2); ctx.fill();
+
+      // 2층 (중간, 중간 초록)
+      ctx.fillStyle = '#2E7D32';
+      ctx.beginPath(); ctx.arc(cx, py + 5, 8, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx - 4, py + 5, 5.5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx + 4, py + 5, 5.5, 0, Math.PI * 2); ctx.fill();
+
+      // 3층 (위, 밝은 초록)
+      ctx.fillStyle = '#43A047';
+      ctx.beginPath(); ctx.arc(cx, py + 2, 7, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx - 3, py + 3, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx + 3, py + 3, 5, 0, Math.PI * 2); ctx.fill();
+
+      // 꼭대기 (가장 밝은 연두)
+      ctx.fillStyle = '#66BB6A';
+      ctx.beginPath(); ctx.arc(cx, py, 5, 0, Math.PI * 2); ctx.fill();
+
+      // 하이라이트 (빛 반사 — 왼쪽 위)
+      ctx.fillStyle = 'rgba(165,214,167,0.5)';
+      ctx.beginPath(); ctx.arc(cx - 3, py - 1, 3, 0, Math.PI * 2); ctx.fill();
+
+      // 수관 전체 외곽 테두리 (어두운 초록)
+      ctx.strokeStyle = '#1B5E20'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(cx, py + 4, 10, 0, Math.PI * 2); ctx.stroke();
+
+      // 그림자 (나무 아래)
+      ctx.fillStyle = 'rgba(0,0,0,0.15)';
       ctx.beginPath();
-      ctx.moveTo(cx - 8, py + CELL - 2);
-      ctx.lineTo(cx - 9, py + CELL - 6);
-      ctx.moveTo(cx + 8, py + CELL - 2);
-      ctx.lineTo(cx + 9, py + CELL - 6);
-      ctx.stroke();
+      ctx.ellipse(cx, py + CELL - 1, CELL * 0.45, 2.5, 0, 0, Math.PI * 2);
+      ctx.fill();
     }
   }
 }
