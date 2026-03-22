@@ -159,8 +159,18 @@ function randomCell() {
 }
 // 뱀 몸통 위에 있는지 확인
 function onSnake(p) { return snake.some(s => s.x===p.x && s.y===p.y); }
-// 다른 일반 몹 위에 있는지 확인 (ex 제외)
-function onEnemy(p, ex) { return enemies.some(e => e!==ex && e.x===p.x && e.y===p.y); }
+// 일반 몹은 2×2 크기 — 좌상단 좌표(e.x, e.y) 기준으로 4칸 반환
+function enemyOccupies(e) {
+  const cells = [];
+  for (let dy = 0; dy < 2; dy++)
+    for (let dx = 0; dx < 2; dx++)
+      cells.push({ x: e.x + dx, y: e.y + dy });
+  return cells;
+}
+// 다른 일반 몹 위에 있는지 확인 (ex 제외, 2×2 크기 반영)
+function onEnemy(p, ex) {
+  return enemies.some(e => e !== ex && enemyOccupies(e).some(c => c.x === p.x && c.y === p.y));
+}
 
 // 보스는 3×3 = 9칸을 차지합니다.
 // 보스의 좌상단 좌표(b.x, b.y)를 기준으로 9개 칸의 좌표를 반환합니다.
@@ -203,11 +213,18 @@ function distToHead(p) {
 function enemyMoveEvery() {
   return level>=6 ? 2 : level>=4 ? 3 : 4;
 }
-// 새 몹 한 마리를 랜덤 위치에 소환합니다.
+// 새 몹 한 마리를 랜덤 위치에 소환합니다. (2×2 크기)
 function spawnEnemy(type) {
   let p, att=0;
-  do { p=randomCell(); att++; }
-  while (att<300 && (onSnake(p)||distToHead(p)<6||onEnemy(p,null)||onBoss(p,null)||onItem(p)||(p.x===food.x&&p.y===food.y)));
+  do {
+    // 2×2이므로 오른쪽·아래쪽 1칸 여유 필요
+    p = { x: Math.floor(Math.random()*(COLS-1)), y: Math.floor(Math.random()*(ROWS-1)) };
+    att++;
+    // 2×2 영역의 4칸 모두 빈 칸이어야 합니다
+    var cells = [{x:p.x,y:p.y},{x:p.x+1,y:p.y},{x:p.x,y:p.y+1},{x:p.x+1,y:p.y+1}];
+  } while (att<300 && cells.some(c =>
+    onSnake(c)||distToHead(c)<6||onEnemy(c,null)||onBoss(c,null)||onItem(c)||(c.x===food.x&&c.y===food.y)
+  ));
   const dirs4=[{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}];
   const d=dirs4[Math.floor(Math.random()*4)];
   // ox, oy: 보간을 위한 이전 위치. mt: 이동 경과 카운터, mi: 이동 주기
@@ -429,6 +446,11 @@ function moveEnemies() {
   });
 }
 
+// 2×2 몹이 게임판 안에 있는지 확인 (좌상단 좌표 기준)
+function enemyInBounds(ex, ey) {
+  return ex >= 0 && ex + 1 < COLS && ey >= 0 && ey + 1 < ROWS;
+}
+
 // 방랑자(wanderer): 25% 확률로 방향 전환, 벽에 닿으면 다른 방향으로
 function moveWanderer(e) {
   const dirs4=[{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}];
@@ -437,12 +459,8 @@ function moveWanderer(e) {
     e.dx=d.x; e.dy=d.y;
   }
   const nx=e.x+e.dx, ny=e.y+e.dy;
-  if (nx<0||nx>=COLS||ny<0||ny>=ROWS) {
-    // 벽에 막히면 갈 수 있는 방향 중 랜덤 선택
-    const opts=dirs4.filter(d=>{
-      const bx=e.x+d.x, by=e.y+d.y;
-      return bx>=0&&bx<COLS&&by>=0&&by<ROWS;
-    });
+  if (!enemyInBounds(nx, ny)) {
+    const opts=dirs4.filter(d => enemyInBounds(e.x+d.x, e.y+d.y));
     if (opts.length) {
       const d=opts[Math.floor(Math.random()*opts.length)];
       e.dx=d.x; e.dy=d.y; e.x+=e.dx; e.y+=e.dy;
@@ -463,7 +481,7 @@ function moveChaser(e) {
   for (const m of [pri,sec,{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}]) {
     if (!m.x&&!m.y) continue;
     const nx=e.x+m.x, ny=e.y+m.y;
-    if (nx>=0&&nx<COLS&&ny>=0&&ny<ROWS) { e.x=nx; e.y=ny; e.dx=m.x; e.dy=m.y; return; }
+    if (enemyInBounds(nx, ny)) { e.x=nx; e.y=ny; e.dx=m.x; e.dy=m.y; return; }
   }
 }
 
@@ -492,9 +510,9 @@ function moveFireballs() {
   fireballs = fireballs.filter(f => f.x>=0&&f.x<COLS&&f.y>=0&&f.y<ROWS);
 }
 
-// 충돌 판정: 뱀 머리가 몹·보스·불덩이에 닿았는지 확인
+// 충돌 판정: 뱀 머리가 몹(2×2)·보스·불덩이에 닿았는지 확인
 function checkCollision(head) {
-  if (enemies.some(e=>e.x===head.x&&e.y===head.y)) return true;
+  if (enemies.some(e=>enemyOccupies(e).some(c=>c.x===head.x&&c.y===head.y))) return true;
   if (bossEnemies.some(b=>bossOccupies(b).some(c=>c.x===head.x&&c.y===head.y))) return true;
   if (fireballs.some(f=>f.x===head.x&&f.y===head.y)) return true;
   return false;
@@ -589,8 +607,8 @@ function tick() {
     moveBosses();
     moveFireballs();
   }
-  // 몹이 뱀의 몸통(꼬리)에 닿으면 그 몹은 사라집니다.
-  enemies = enemies.filter(e => !snake.slice(1).some(s=>s.x===e.x&&s.y===e.y));
+  // 몹(2×2)이 뱀의 몸통(꼬리)에 닿으면 그 몹은 사라집니다.
+  enemies = enemies.filter(e => !enemyOccupies(e).some(c => snake.slice(1).some(s=>s.x===c.x&&s.y===c.y)));
   tickEffects();
 
   // 이동 후 다시 한 번 충돌 확인 (불덩이가 이동해서 뱀과 겹칠 수 있음) — 무적이면 무시
@@ -1345,183 +1363,300 @@ function drawFireballs() {
   });
 }
 
-// ── 일반 몹 그리기 (아기자기한 오크 스타일) ─────────────────
-// 각 몹 타입별 색상 정의 (오크 피부색 계열)
+// ── 일반 몹 그리기 (2×2 귀여운 몬스터 스타일) ──────────────
+// 이미지 참고: 둥근 몸통 + 뿔/귀 + 큰 눈 + 이빨 + 털/가시 장식
 const ENEMY_STYLE = {
-  wanderer:   { skin:'#7CB342', skinDark:'#558B2F', glow:'rgba(124,179,66,0.35)', ear:'#689F38' },  // 초록 오크
-  chaser:     { skin:'#E53935', skinDark:'#B71C1C', glow:'rgba(229,57,53,0.4)',   ear:'#C62828' },  // 빨강 오크
-  teleporter: { skin:'#7E57C2', skinDark:'#4527A0', glow:'rgba(126,87,194,0.4)',  ear:'#5E35B1' },  // 보라 오크
+  wanderer: {
+    body: '#E53935', bodyDark: '#B71C1C', outline: '#7f1d1d',  // 빨강 몬스터
+    horn: '#FBC02D', eyeColor: '#1a1a1a', glow: 'rgba(229,57,53,0.3)',
+  },
+  chaser: {
+    body: '#039BE5', bodyDark: '#0277BD', outline: '#01579B',  // 파랑 몬스터
+    horn: '#FDD835', eyeColor: '#1a1a1a', glow: 'rgba(3,155,229,0.3)',
+  },
+  teleporter: {
+    body: '#8E24AA', bodyDark: '#6A1B9A', outline: '#4A148C',  // 보라 몬스터
+    horn: '#FF8F00', eyeColor: '#1a1a1a', glow: 'rgba(142,36,170,0.3)',
+  },
 };
-function drawEnemies() { enemies.forEach(e=>drawEnemy(e)); }
+function drawEnemies() { enemies.forEach(e => drawEnemy(e)); }
 
 function drawEnemy(e) {
   // 순간이동자가 이동 직전이면 깜빡이게 합니다.
-  if (e.type==='teleporter'&&e.teleTimer>=16&&tickCount%4<2) return;
+  if (e.type === 'teleporter' && e.teleTimer >= 16 && tickCount % 4 < 2) return;
 
-  // 보간 위치 계산 (teleporter는 보간 없이 즉시 이동)
+  // 보간 위치 계산 (2×2이므로 중심은 +1칸씩)
   const mi = e.mi || 4;
-  const t  = e.type==='teleporter' ? 1 : Math.min(1, ((e.mt??mi) + tickProgress) / mi);
-  const rx = e.ox!=null ? e.ox+(e.x-e.ox)*t : e.x;
-  const ry = e.oy!=null ? e.oy+(e.y-e.oy)*t : e.y;
-  const x=rx*CELL, y=ry*CELL, cx=x+CELL/2, cy=y+CELL/2;
-  const s=ENEMY_STYLE[e.type];
-  const R = CELL * 0.44; // 오크 몸통 반지름
+  const t  = e.type === 'teleporter' ? 1 : Math.min(1, ((e.mt ?? mi) + tickProgress) / mi);
+  const rx = e.ox != null ? e.ox + (e.x - e.ox) * t : e.x;
+  const ry = e.oy != null ? e.oy + (e.y - e.oy) * t : e.y;
+  // 2×2 크기의 중심 좌표 (좌상단 + 1칸)
+  const cx = (rx + 1) * CELL, cy = (ry + 1) * CELL;
+  const S  = CELL; // 2×2 = 40px, 반지름 = CELL (20px)
+  const R  = S * 0.85; // 몸통 반지름
+  const s  = ENEMY_STYLE[e.type];
+  const now = performance.now();
 
-  // 글로우 효과
-  const grd=ctx.createRadialGradient(cx,cy,1,cx,cy,CELL*0.95);
-  grd.addColorStop(0,s.glow); grd.addColorStop(1,'transparent');
-  ctx.fillStyle=grd; ctx.fillRect(x-CELL*0.45,y-CELL*0.45,CELL*1.9,CELL*1.9);
-
-  // ── 뾰족한 귀 2개 (머리 양옆 위쪽) ──
-  ctx.fillStyle = s.ear;
-  // 왼쪽 귀
+  // ── 0단계: 바닥 그림자 (떠 있는 느낌) ──
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
   ctx.beginPath();
-  ctx.moveTo(cx - R * 0.7, cy - R * 0.3);
-  ctx.lineTo(cx - R * 1.3, cy - R * 1.2);
-  ctx.lineTo(cx - R * 0.2, cy - R * 0.6);
-  ctx.closePath(); ctx.fill();
-  // 오른쪽 귀
-  ctx.beginPath();
-  ctx.moveTo(cx + R * 0.7, cy - R * 0.3);
-  ctx.lineTo(cx + R * 1.3, cy - R * 1.2);
-  ctx.lineTo(cx + R * 0.2, cy - R * 0.6);
-  ctx.closePath(); ctx.fill();
-  // 귀 안쪽 (연한 색)
-  ctx.fillStyle = 'rgba(255,200,180,0.35)';
-  ctx.beginPath();
-  ctx.moveTo(cx - R * 0.6, cy - R * 0.35);
-  ctx.lineTo(cx - R * 1.1, cy - R * 1.0);
-  ctx.lineTo(cx - R * 0.3, cy - R * 0.55);
-  ctx.closePath(); ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(cx + R * 0.6, cy - R * 0.35);
-  ctx.lineTo(cx + R * 1.1, cy - R * 1.0);
-  ctx.lineTo(cx + R * 0.3, cy - R * 0.55);
-  ctx.closePath(); ctx.fill();
+  ctx.ellipse(cx, cy + R + 3, R * 0.7, R * 0.18, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 
-  // ── 둥근 머리 (오크 피부색 그라데이션) ──
-  const headGrd = ctx.createRadialGradient(cx - 2, cy - 2, 1, cx, cy, R);
-  headGrd.addColorStop(0, s.skin);       // 밝은 피부
-  headGrd.addColorStop(1, s.skinDark);   // 어두운 피부
-  ctx.fillStyle = headGrd;
-  ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
+  // ── 1단계: 털/가시 장식 (몸통 주변에 뾰족하게 튀어나온 털) ──
+  const spikeCount = e.type === 'wanderer' ? 10 : e.type === 'chaser' ? 8 : 12;
+  for (let i = 0; i < spikeCount; i++) {
+    const angle = (i / spikeCount) * Math.PI * 2 + Math.sin(now / 400 + i) * 0.1;
+    const spikeR = R + 4 + Math.sin(now / 300 + i * 1.7) * 2; // 살짝 흔들림
+    const baseR = R - 1;
+    const sx = cx + Math.cos(angle) * spikeR;
+    const sy = cy + Math.sin(angle) * spikeR - 2; // 약간 위로 (떠있는 느낌)
+    const bx1 = cx + Math.cos(angle - 0.25) * baseR;
+    const by1 = cy + Math.sin(angle - 0.25) * baseR - 2;
+    const bx2 = cx + Math.cos(angle + 0.25) * baseR;
+    const by2 = cy + Math.sin(angle + 0.25) * baseR - 2;
+    ctx.fillStyle = s.body;
+    ctx.beginPath();
+    ctx.moveTo(bx1, by1); ctx.lineTo(sx, sy); ctx.lineTo(bx2, by2);
+    ctx.closePath(); ctx.fill();
+  }
 
-  // 머리 테두리
-  ctx.strokeStyle = s.skinDark;
-  ctx.lineWidth = 1.2;
-  ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
+  // ── 2단계: 둥근 몸통 (3D 구체 그라데이션) ──
+  const bodyGrd = ctx.createRadialGradient(cx - 4, cy - 6, 2, cx, cy - 2, R);
+  bodyGrd.addColorStop(0, s.body);       // 밝은 면
+  bodyGrd.addColorStop(0.7, s.body);
+  bodyGrd.addColorStop(1, s.bodyDark);   // 어두운 가장자리
+  ctx.fillStyle = bodyGrd;
+  ctx.beginPath(); ctx.arc(cx, cy - 2, R, 0, Math.PI * 2); ctx.fill();
 
-  // ── 타입별 얼굴 표현 ──
+  // 몸통 테두리 (두꺼운 검정 외곽선 — 캐릭터 느낌)
+  ctx.strokeStyle = s.outline;
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(cx, cy - 2, R, 0, Math.PI * 2); ctx.stroke();
+
+  // 상단 하이라이트 (빛 반사)
+  ctx.fillStyle = 'rgba(255,255,255,0.25)';
+  ctx.beginPath();
+  ctx.ellipse(cx - 3, cy - R * 0.5, R * 0.4, R * 0.2, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+
+  // ── 3단계: 뿔 (타입별 다른 뿔 모양) ──
   if (e.type === 'wanderer') {
-    // 방랑자 오크: 커다란 동그란 눈 + 아래 송곳니 + 멍청한 표정
-    // 큰 흰 눈
-    ctx.fillStyle = '#fff';
-    ctx.beginPath(); ctx.arc(cx - 3.2, cy - 1.5, 3.2, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(cx + 3.2, cy - 1.5, 3.2, 0, Math.PI * 2); ctx.fill();
-    // 동공 (약간 위를 쳐다봄)
-    ctx.fillStyle = '#1a1a1a';
-    ctx.beginPath(); ctx.arc(cx - 3.2, cy - 2.2, 1.8, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(cx + 3.2, cy - 2.2, 1.8, 0, Math.PI * 2); ctx.fill();
-    // 눈 반짝임
-    ctx.fillStyle = '#fff';
-    ctx.beginPath(); ctx.arc(cx - 3.8, cy - 2.8, 0.8, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(cx + 2.6, cy - 2.8, 0.8, 0, Math.PI * 2); ctx.fill();
-    // 넓적한 입 (열린 입)
-    ctx.fillStyle = '#4E342E';
-    ctx.beginPath();
-    ctx.ellipse(cx, cy + 3.8, 3.5, 2.2, 0, 0, Math.PI);
-    ctx.fill();
-    // 아래에서 올라온 송곳니 2개 (오크 특징)
-    ctx.fillStyle = '#FFFDE7';
-    ctx.beginPath();
-    ctx.moveTo(cx - 3, cy + 2.5); ctx.lineTo(cx - 2, cy + 0.5); ctx.lineTo(cx - 1, cy + 2.5);
-    ctx.closePath(); ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(cx + 1, cy + 2.5); ctx.lineTo(cx + 2, cy + 0.5); ctx.lineTo(cx + 3, cy + 2.5);
-    ctx.closePath(); ctx.fill();
+    // 방랑자: 짧고 둥근 뿔 2개 (빨간 몬스터의 노란 뿔)
+    [[-0.55, -0.75, -0.2], [0.55, -0.75, 0.2]].forEach(([ox, oy, tilt]) => {
+      const hx = cx + R * ox, hy = cy + R * oy - 2;
+      ctx.fillStyle = s.horn;
+      ctx.beginPath();
+      ctx.moveTo(hx - 4, hy + 2);
+      ctx.quadraticCurveTo(hx + tilt * 8, hy - 10, hx + 4, hy + 2);
+      ctx.closePath(); ctx.fill();
+      // 뿔 테두리
+      ctx.strokeStyle = '#F9A825'; ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(hx - 4, hy + 2);
+      ctx.quadraticCurveTo(hx + tilt * 8, hy - 10, hx + 4, hy + 2);
+      ctx.stroke();
+    });
 
   } else if (e.type === 'chaser') {
-    // 추격자 오크: 화난 눈썹 + 이글이글 눈 + 큰 송곳니
-    // 화난 눈
-    ctx.fillStyle = '#FFEB3B';
-    ctx.beginPath(); ctx.arc(cx - 3, cy - 1.5, 2.8, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(cx + 3, cy - 1.5, 2.8, 0, Math.PI * 2); ctx.fill();
-    // 세로 슬릿 동공 (사나운 느낌)
-    ctx.fillStyle = '#B71C1C';
-    ctx.beginPath(); ctx.ellipse(cx - 3, cy - 1.5, 0.8, 2.2, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(cx + 3, cy - 1.5, 0.8, 2.2, 0, 0, Math.PI * 2); ctx.fill();
-    // 화난 눈썹 (V자)
-    ctx.strokeStyle = s.skinDark; ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(cx - 5.5, cy - 4.5); ctx.lineTo(cx - 1.5, cy - 3);
-    ctx.moveTo(cx + 5.5, cy - 4.5); ctx.lineTo(cx + 1.5, cy - 3);
-    ctx.stroke();
-    // 으르렁 입 + 큰 이빨
-    ctx.fillStyle = '#3E2723';
-    ctx.beginPath();
-    ctx.moveTo(cx - 4, cy + 3); ctx.quadraticCurveTo(cx, cy + 6.5, cx + 4, cy + 3);
-    ctx.closePath(); ctx.fill();
-    // 이빨 3개 (위에서 아래로)
-    ctx.fillStyle = '#FFFDE7';
-    for (let i = -1; i <= 1; i++) {
+    // 추격자: 크고 날카로운 뿔 2개 (파란 몬스터의 노란 뿔)
+    [[-0.5, -0.8, -0.4], [0.5, -0.8, 0.4]].forEach(([ox, oy, tilt]) => {
+      const hx = cx + R * ox, hy = cy + R * oy - 2;
+      ctx.fillStyle = s.horn;
       ctx.beginPath();
-      ctx.moveTo(cx + i * 2.5 - 1, cy + 3);
-      ctx.lineTo(cx + i * 2.5, cy + 5);
-      ctx.lineTo(cx + i * 2.5 + 1, cy + 3);
+      ctx.moveTo(hx - 3, hy + 3);
+      ctx.lineTo(hx + tilt * 12, hy - 14);
+      ctx.lineTo(hx + 3, hy + 3);
       ctx.closePath(); ctx.fill();
-    }
-    // 상처 자국 (왼쪽 뺨에 X표시)
-    ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 1;
+      ctx.strokeStyle = '#F57F17'; ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(hx - 3, hy + 3);
+      ctx.lineTo(hx + tilt * 12, hy - 14);
+      ctx.lineTo(hx + 3, hy + 3);
+      ctx.stroke();
+    });
+
+  } else {
+    // 순간이동자: 작은 뿔 3개 (보라 몬스터의 주황 뿔)
+    [[-0.6, -0.7], [0, -1.0], [0.6, -0.7]].forEach(([ox, oy]) => {
+      const hx = cx + R * ox, hy = cy + R * oy - 2;
+      ctx.fillStyle = s.horn;
+      ctx.beginPath();
+      ctx.moveTo(hx - 3, hy + 3);
+      ctx.quadraticCurveTo(hx, hy - 8, hx + 3, hy + 3);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = '#EF6C00'; ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(hx - 3, hy + 3);
+      ctx.quadraticCurveTo(hx, hy - 8, hx + 3, hy + 3);
+      ctx.stroke();
+    });
+  }
+
+  // ── 4단계: 큰 눈 (타입별 다른 눈 스타일) ──
+  if (e.type === 'wanderer') {
+    // 방랑자: 크고 동그란 두 눈 (멍청하고 귀여운 느낌)
+    const eyeR = 7;
+    [-7, 7].forEach(ox => {
+      const ex = cx + ox, ey = cy - 4;
+      // 흰 눈
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(ex, ey, eyeR, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = s.outline; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(ex, ey, eyeR, 0, Math.PI * 2); ctx.stroke();
+      // 검은 동공 (크고 귀여운)
+      ctx.fillStyle = '#1a1a1a';
+      ctx.beginPath(); ctx.arc(ex + 1, ey + 1, 4, 0, Math.PI * 2); ctx.fill();
+      // 반짝임 2개
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(ex - 1, ey - 2, 2, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(ex + 2, ey + 1, 0.8, 0, Math.PI * 2); ctx.fill();
+    });
+
+  } else if (e.type === 'chaser') {
+    // 추격자: 크고 화난 눈 (눈썹이 V자로 치켜올라감)
+    const eyeR = 6.5;
+    [-7, 7].forEach(ox => {
+      const ex = cx + ox, ey = cy - 3;
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(ex, ey, eyeR, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = s.outline; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(ex, ey, eyeR, 0, Math.PI * 2); ctx.stroke();
+      // 동공
+      ctx.fillStyle = '#1a1a1a';
+      ctx.beginPath(); ctx.arc(ex, ey + 1, 3.5, 0, Math.PI * 2); ctx.fill();
+      // 빨간 홍채 테두리
+      ctx.strokeStyle = '#D32F2F'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(ex, ey + 1, 3.5, 0, Math.PI * 2); ctx.stroke();
+      // 반짝임
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(ex - 1.5, ey - 1.5, 1.5, 0, Math.PI * 2); ctx.fill();
+    });
+    // V자 화난 눈썹
+    ctx.strokeStyle = s.outline; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.moveTo(cx - 6, cy); ctx.lineTo(cx - 4, cy + 2);
-    ctx.moveTo(cx - 4, cy); ctx.lineTo(cx - 6, cy + 2);
+    ctx.moveTo(cx - 14, cy - 12); ctx.lineTo(cx - 4, cy - 8);
+    ctx.moveTo(cx + 14, cy - 12); ctx.lineTo(cx + 4, cy - 8);
     ctx.stroke();
 
   } else {
-    // 순간이동자 오크: 마법사 모자 + 반짝이는 보라 눈 + 충전 링
-    // 마법 반짝이는 눈
-    const now = performance.now();
+    // 순간이동자: 한쪽 큰 눈 + 한쪽 작은 눈 (장난스러운 비대칭)
     const sparkle = 0.6 + 0.4 * Math.sin(now / 200);
-    ctx.fillStyle = `rgba(206,147,255,${sparkle})`;
-    ctx.beginPath(); ctx.arc(cx - 3, cy - 1, 2.5, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(cx + 3, cy - 1, 2.5, 0, Math.PI * 2); ctx.fill();
-    // 밝은 동공
+    // 큰 눈 (왼쪽)
+    const bigR = 8;
     ctx.fillStyle = '#fff';
-    ctx.beginPath(); ctx.arc(cx - 3, cy - 1.5, 1.2, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(cx + 3, cy - 1.5, 1.2, 0, Math.PI * 2); ctx.fill();
-    // 입 (~모양으로 여유로운 미소)
-    ctx.strokeStyle = s.skinDark; ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(cx - 3, cy + 3);
-    ctx.quadraticCurveTo(cx - 1.5, cy + 5, cx, cy + 3);
-    ctx.quadraticCurveTo(cx + 1.5, cy + 1, cx + 3, cy + 3);
-    ctx.stroke();
-    // 작은 별 장식 (머리 위에 반짝이는 별)
-    ctx.fillStyle = `rgba(255,235,59,${sparkle})`;
-    ctx.font = `${Math.round(CELL * 0.3)}px sans-serif`;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('✦', cx, cy - R - 3);
+    ctx.beginPath(); ctx.arc(cx - 5, cy - 3, bigR, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = s.outline; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(cx - 5, cy - 3, bigR, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#1a1a1a';
+    ctx.beginPath(); ctx.arc(cx - 4, cy - 2, 4.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(cx - 6, cy - 5, 2.2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx - 2, cy, 0.8, 0, Math.PI * 2); ctx.fill();
+    // 작은 눈 (오른쪽)
+    const smR = 5.5;
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(cx + 8, cy - 1, smR, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = s.outline; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(cx + 8, cy - 1, smR, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#1a1a1a';
+    ctx.beginPath(); ctx.arc(cx + 8.5, cy, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(cx + 7, cy - 2.5, 1.5, 0, Math.PI * 2); ctx.fill();
 
-    // 이동 전 충전 게이지 링
+    // 충전 링
     if (e.teleTimer > 5) {
       ctx.strokeStyle = `rgba(206,147,255,${0.4 + sparkle * 0.3})`;
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 2.5;
       ctx.beginPath();
-      ctx.arc(cx, cy, R + 2, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (e.teleTimer / 22));
+      ctx.arc(cx, cy - 2, R + 4, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (e.teleTimer / 22));
       ctx.stroke();
     }
   }
 
-  // 몹 타입 레이블 배지 (방/추/순)
+  // ── 5단계: 입 (타입별) ──
+  if (e.type === 'wanderer') {
+    // 크게 벌린 입 + 이빨 2개 (귀여운 느낌)
+    ctx.fillStyle = '#4E342E';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + 9, 8, 5.5, 0, 0, Math.PI);
+    ctx.fill();
+    ctx.strokeStyle = s.outline; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + 9, 8, 5.5, 0, 0, Math.PI);
+    ctx.stroke();
+    // 이빨 (위에서 아래로 삐죽)
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.moveTo(cx - 4, cy + 7); ctx.lineTo(cx - 2, cy + 12); ctx.lineTo(cx, cy + 7);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(cx + 1, cy + 7); ctx.lineTo(cx + 3, cy + 12); ctx.lineTo(cx + 5, cy + 7);
+    ctx.closePath(); ctx.fill();
+    // 혀 (분홍)
+    ctx.fillStyle = '#E91E63';
+    ctx.beginPath();
+    ctx.ellipse(cx + 1, cy + 13, 3.5, 2, 0.2, 0, Math.PI * 2);
+    ctx.fill();
+
+  } else if (e.type === 'chaser') {
+    // 으르렁 입 + 삐죽 이빨 여러 개
+    ctx.fillStyle = '#3E2723';
+    ctx.beginPath();
+    ctx.moveTo(cx - 10, cy + 6);
+    ctx.quadraticCurveTo(cx, cy + 16, cx + 10, cy + 6);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = s.outline; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(cx - 10, cy + 6);
+    ctx.quadraticCurveTo(cx, cy + 16, cx + 10, cy + 6);
+    ctx.stroke();
+    // 지그재그 이빨 (위쪽에서 아래로 + 아래쪽에서 위로)
+    ctx.fillStyle = '#fff';
+    for (let i = -3; i <= 3; i++) {
+      const tx = cx + i * 3;
+      // 위에서 아래로
+      ctx.beginPath();
+      ctx.moveTo(tx - 1.5, cy + 6); ctx.lineTo(tx, cy + 10); ctx.lineTo(tx + 1.5, cy + 6);
+      ctx.closePath(); ctx.fill();
+    }
+
+  } else {
+    // 순간이동자: 동그란 O 모양 입 (놀란 표정)
+    ctx.fillStyle = '#311B92';
+    ctx.beginPath();
+    ctx.arc(cx + 2, cy + 9, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = s.outline; ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(cx + 2, cy + 9, 4, 0, Math.PI * 2);
+    ctx.stroke();
+    // 혀 살짝
+    ctx.fillStyle = '#E91E63';
+    ctx.beginPath();
+    ctx.ellipse(cx + 2, cy + 12, 2.5, 1.5, 0, 0, Math.PI);
+    ctx.fill();
+  }
+
+  // ── 6단계: 발 (동글동글한 작은 발 2개) ──
+  ctx.fillStyle = s.bodyDark;
+  ctx.beginPath(); ctx.ellipse(cx - 6, cy + R - 1, 5, 3, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(cx + 6, cy + R - 1, 5, 3, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = s.outline; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.ellipse(cx - 6, cy + R - 1, 5, 3, 0, 0, Math.PI * 2); ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(cx + 6, cy + R - 1, 5, 3, 0, 0, Math.PI * 2); ctx.stroke();
+
+  // ── 7단계: 타입 배지 ──
   const labels = { wanderer: '방', chaser: '추', teleporter: '순' };
-  const badgeColor = { wanderer: '#558B2F', chaser: '#B71C1C', teleporter: '#4527A0' };
-  ctx.fillStyle = badgeColor[e.type];
-  roundRect(ctx, cx - 5, y - 9, 11, 9, 3); ctx.fill();
-  ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 0.6;
-  roundRect(ctx, cx - 5, y - 9, 11, 9, 3); ctx.stroke();
-  ctx.fillStyle = '#fff'; ctx.font = 'bold 6px sans-serif';
+  ctx.fillStyle = s.outline;
+  roundRect(ctx, cx - 6, cy - R - 18, 13, 11, 3); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 0.8;
+  roundRect(ctx, cx - 6, cy - R - 18, 13, 11, 3); ctx.stroke();
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 7px sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(labels[e.type], cx + 0.5, y - 4.5);
+  ctx.fillText(labels[e.type], cx + 0.5, cy - R - 12.5);
 }
 
 // ── 보스 그리기 ──────────────────────────────────────────────
