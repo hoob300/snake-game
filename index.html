@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="theme-color" content="#0f0f1a" />
-  <title>🐍 지렁이 게임</title>
+  <title>🐍 뱀 게임</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -34,9 +34,28 @@
       <canvas id="game-canvas" width="480" height="600"></canvas>
       <div class="overlay" id="overlay">
         <div class="overlay-content">
-          <div class="overlay-icon" id="overlay-icon">🐍</div>
-          <h2 id="overlay-title">지렁이 게임</h2>
-          <p id="overlay-msg">방향키·WASD 또는 화면 스와이프로 이동</p>
+          <!-- 장식 뱀들 (양쪽에서 감싸는 형태) -->
+          <div class="title-snakes">
+            <div class="title-snake left">🐍</div>
+            <div class="title-snake right">🐍</div>
+          </div>
+
+          <!-- 메인 타이틀 -->
+          <div class="title-logo" id="overlay-icon">
+            <span class="title-text-snake">SNAKE</span>
+            <span class="title-text-game">GAME</span>
+          </div>
+
+          <!-- 별/반짝이 장식 -->
+          <div class="title-stars">
+            <span class="star s1">⭐</span>
+            <span class="star s2">✨</span>
+            <span class="star s3">⭐</span>
+            <span class="star s4">✨</span>
+          </div>
+
+          <p id="overlay-title" class="title-sub"></p>
+          <p id="overlay-msg" class="title-hint">방향키·WASD 또는 화면 스와이프로 이동</p>
 
           <div id="name-section" class="name-section hidden">
             <p class="name-label">🎖 기록을 남기세요</p>
@@ -49,7 +68,7 @@
             <button id="skip-btn" class="skip-btn">건너뛰기</button>
           </div>
 
-          <button id="start-btn">시작하기</button>
+          <button id="start-btn" class="start-btn-main">▶ START</button>
         </div>
       </div>
     </div>

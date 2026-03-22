@@ -2238,7 +2238,7 @@ function gameOver() {
   saveBest(score);        // 최고 점수 갱신 여부 확인 및 저장
 
   // 오버레이에 게임 오버 메시지 표시
-  overlayIcon.textContent='💀';
+  overlayIcon.innerHTML='<span style="font-size:clamp(48px,14vw,72px)">💀</span>';
   overlayTitle.textContent='게임 오버';
   overlayMsg.textContent=`점수: ${score}  |  최고점수: ${getBest()}`;
   startBtn.classList.add('hidden');
@@ -2273,7 +2273,7 @@ function togglePause() {
   paused=!paused;
   if (paused) {
     // 일시 정지 오버레이 표시
-    overlayIcon.textContent='⏸';
+    overlayIcon.innerHTML='<span style="font-size:clamp(48px,14vw,72px)">⏸</span>';
     overlayTitle.textContent='일시 정지';
     overlayMsg.textContent='Space 또는 ⏸ 버튼으로 재개';
     startBtn.textContent='재개하기';
