@@ -1775,15 +1775,7 @@ function drawEnemy(e) {
   ctx.beginPath(); ctx.ellipse(cx - 6, cy + R - 1, 5, 3, 0, 0, Math.PI * 2); ctx.stroke();
   ctx.beginPath(); ctx.ellipse(cx + 6, cy + R - 1, 5, 3, 0, 0, Math.PI * 2); ctx.stroke();
 
-  // ── 7단계: 타입 배지 ──
-  const labels = { wanderer: '방', chaser: '추', teleporter: '순' };
-  ctx.fillStyle = s.outline;
-  roundRect(ctx, cx - 6, cy - R - 18, 13, 11, 3); ctx.fill();
-  ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 0.8;
-  roundRect(ctx, cx - 6, cy - R - 18, 13, 11, 3); ctx.stroke();
-  ctx.fillStyle = '#fff'; ctx.font = 'bold 7px sans-serif';
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(labels[e.type], cx + 0.5, cy - R - 12.5);
+  // (타입 배지 레이블 삭제됨)
 }
 
 // ── 보스 그리기 ──────────────────────────────────────────────
