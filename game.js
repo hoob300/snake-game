@@ -90,7 +90,7 @@ const ENEMY_INTRO = {
   4:'방랑자 추가!', 5:'추격자 추가!', 6:'순간이동자 등장!',
 };
 
-// ── 필드 장애물(나무) 맵 ──────────────────────────────────────
+// ── 필드 장애물(나무) 맵 ─────────────────────────────────────
 // 2 = 벽 나무(테두리), 1 = 필드 내 나무, 0 = 빈 칸
 // 뱀·몹·먹이 모두 0이 아닌 칸에 놓일 수 없습니다.
 // 25×30 맵. 뱀 시작 위치(10,10) 주변은 반드시 비워둡니다.
@@ -1161,7 +1161,7 @@ function drawSnake() {
     const tipX = tail.x + tDir.x * tR * 0.3; // 약간 끝 방향으로 이동
     const tipY = tail.y + tDir.y * tR * 0.3;
     const tGrd = ctx.createRadialGradient(tipX - 1, tipY - 1, 0, tipX, tipY, tR);
-    tGrd.addColorStop(0, SNAKE_MAIN);
+    tGrd.addColorStop(0, '#3E8E41');
     tGrd.addColorStop(1, SNAKE_DARK);
     ctx.fillStyle = tGrd;
     ctx.beginPath(); ctx.arc(tipX, tipY, tR, 0, Math.PI * 2); ctx.fill();
