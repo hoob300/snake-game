@@ -1915,40 +1915,101 @@ function drawBoss(boss) {
 
   // ── 팔다리 (몸통 뒤에 그려야 함) ──
   const limbTime = now / 300;
-  const limbColor = st.border;
 
-  // 왼손 (몸체 왼쪽)
-  const lhSwing = Math.sin(limbTime + 1) * 8;
-  const lhx = x - 6, lhy = cy - 8 + lhSwing;
-  ctx.fillStyle = limbColor;
-  ctx.beginPath(); ctx.arc(lhx, lhy, 6, 0, Math.PI * 2); ctx.fill();
-  // 왼팔 연결
-  ctx.strokeStyle = limbColor; ctx.lineWidth = 4; ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.moveTo(x + 4, cy - 4); ctx.lineTo(lhx, lhy); ctx.stroke();
+  // ── 사실적인 팔/다리 그리기 ──
+  const skinColor = st.border;
+  const skinDark = st.bg;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
 
-  // 오른손 (몸체 오른쪽)
-  const rhSwing = Math.sin(limbTime + 3) * 8;
-  const rhx = x + W + 6, rhy = cy - 8 + rhSwing;
-  ctx.fillStyle = limbColor;
-  ctx.beginPath(); ctx.arc(rhx, rhy, 6, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = limbColor; ctx.lineWidth = 4;
-  ctx.beginPath(); ctx.moveTo(x + W - 4, cy - 4); ctx.lineTo(rhx, rhy); ctx.stroke();
+  // 왼팔 (어깨 → 팔꿈치 → 손)
+  const lShX = x + 6, lShY = cy - W * 0.15; // 어깨
+  const lElSwing = Math.sin(limbTime + 1) * 6;
+  const lElX = x - 8, lElY = cy - 2 + lElSwing; // 팔꿈치
+  const lHdX = x - 12, lHdY = cy + 8 + lElSwing * 0.8; // 손
+  // 팔 (상완 + 하완)
+  ctx.strokeStyle = skinColor; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo(lShX, lShY);
+  ctx.quadraticCurveTo(lElX + 4, lElY - 4, lElX, lElY); ctx.stroke();
+  ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(lElX, lElY);
+  ctx.quadraticCurveTo(lHdX + 2, lHdY - 3, lHdX, lHdY); ctx.stroke();
+  // 손 (둥근 손바닥 + 손가락 3개)
+  ctx.fillStyle = skinColor;
+  ctx.beginPath(); ctx.arc(lHdX, lHdY, 5, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = skinColor; ctx.lineWidth = 2.5;
+  for (let f = -1; f <= 1; f++) {
+    ctx.beginPath();
+    ctx.moveTo(lHdX - 2, lHdY + f * 3);
+    ctx.lineTo(lHdX - 6, lHdY + f * 4 - 1);
+    ctx.stroke();
+  }
+  // 팔꿈치 관절
+  ctx.fillStyle = skinDark;
+  ctx.beginPath(); ctx.arc(lElX, lElY, 3, 0, Math.PI * 2); ctx.fill();
 
-  // 왼발 (몸체 아래 왼쪽)
-  const lfSwing = Math.sin(limbTime + 0.5) * 5;
-  const lfx = cx - W * 0.25, lfy = y + H + 5 + lfSwing;
-  ctx.fillStyle = limbColor;
-  ctx.beginPath(); ctx.ellipse(lfx, lfy, 7, 5, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = limbColor; ctx.lineWidth = 4;
-  ctx.beginPath(); ctx.moveTo(lfx, y + H - 4); ctx.lineTo(lfx, lfy - 3); ctx.stroke();
+  // 오른팔 (대칭)
+  const rShX = x + W - 6, rShY = cy - W * 0.15;
+  const rElSwing = Math.sin(limbTime + 3) * 6;
+  const rElX = x + W + 8, rElY = cy - 2 + rElSwing;
+  const rHdX = x + W + 12, rHdY = cy + 8 + rElSwing * 0.8;
+  ctx.strokeStyle = skinColor; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo(rShX, rShY);
+  ctx.quadraticCurveTo(rElX - 4, rElY - 4, rElX, rElY); ctx.stroke();
+  ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(rElX, rElY);
+  ctx.quadraticCurveTo(rHdX - 2, rHdY - 3, rHdX, rHdY); ctx.stroke();
+  ctx.fillStyle = skinColor;
+  ctx.beginPath(); ctx.arc(rHdX, rHdY, 5, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = skinColor; ctx.lineWidth = 2.5;
+  for (let f = -1; f <= 1; f++) {
+    ctx.beginPath();
+    ctx.moveTo(rHdX + 2, rHdY + f * 3);
+    ctx.lineTo(rHdX + 6, rHdY + f * 4 - 1);
+    ctx.stroke();
+  }
+  ctx.fillStyle = skinDark;
+  ctx.beginPath(); ctx.arc(rElX, rElY, 3, 0, Math.PI * 2); ctx.fill();
 
-  // 오른발 (몸체 아래 오른쪽)
-  const rfSwing = Math.sin(limbTime + 2.5) * 5;
-  const rfx = cx + W * 0.25, rfy = y + H + 5 + rfSwing;
-  ctx.fillStyle = limbColor;
-  ctx.beginPath(); ctx.ellipse(rfx, rfy, 7, 5, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = limbColor; ctx.lineWidth = 4;
-  ctx.beginPath(); ctx.moveTo(rfx, y + H - 4); ctx.lineTo(rfx, rfy - 3); ctx.stroke();
+  // 왼다리 (허벅지 → 무릎 → 발)
+  const lHipX = cx - W * 0.2, lHipY = y + H - 4;
+  const lKnSwing = Math.sin(limbTime + 0.5) * 4;
+  const lKnX = lHipX - 3, lKnY = y + H + 8 + lKnSwing;
+  const lFtX = lHipX - 1, lFtY = y + H + 18 + lKnSwing * 0.6;
+  // 다리
+  ctx.strokeStyle = skinColor; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo(lHipX, lHipY);
+  ctx.quadraticCurveTo(lKnX - 2, lKnY - 2, lKnX, lKnY); ctx.stroke();
+  ctx.lineWidth = 4.5;
+  ctx.beginPath(); ctx.moveTo(lKnX, lKnY);
+  ctx.lineTo(lFtX, lFtY - 3); ctx.stroke();
+  // 무릎 관절
+  ctx.fillStyle = skinDark;
+  ctx.beginPath(); ctx.arc(lKnX, lKnY, 3, 0, Math.PI * 2); ctx.fill();
+  // 발 (타원 + 발가락 2개)
+  ctx.fillStyle = skinColor;
+  ctx.beginPath(); ctx.ellipse(lFtX, lFtY, 8, 4.5, 0.1, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = skinDark; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(lFtX - 4, lFtY); ctx.lineTo(lFtX - 4, lFtY + 1); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(lFtX + 2, lFtY); ctx.lineTo(lFtX + 2, lFtY + 1); ctx.stroke();
+
+  // 오른다리 (대칭)
+  const rHipX = cx + W * 0.2, rHipY = y + H - 4;
+  const rKnSwing = Math.sin(limbTime + 2.5) * 4;
+  const rKnX = rHipX + 3, rKnY = y + H + 8 + rKnSwing;
+  const rFtX = rHipX + 1, rFtY = y + H + 18 + rKnSwing * 0.6;
+  ctx.strokeStyle = skinColor; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo(rHipX, rHipY);
+  ctx.quadraticCurveTo(rKnX + 2, rKnY - 2, rKnX, rKnY); ctx.stroke();
+  ctx.lineWidth = 4.5;
+  ctx.beginPath(); ctx.moveTo(rKnX, rKnY);
+  ctx.lineTo(rFtX, rFtY - 3); ctx.stroke();
+  ctx.fillStyle = skinDark;
+  ctx.beginPath(); ctx.arc(rKnX, rKnY, 3, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = skinColor;
+  ctx.beginPath(); ctx.ellipse(rFtX, rFtY, 8, 4.5, -0.1, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = skinDark; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(rFtX - 2, rFtY); ctx.lineTo(rFtX - 2, rFtY + 1); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(rFtX + 4, rFtY); ctx.lineTo(rFtX + 4, rFtY + 1); ctx.stroke();
 
   // ── 글로우 맥동 ──
   const gs=W*(0.65+Math.sin(boss.glowPhase)*0.12);

@@ -208,30 +208,92 @@ header {
   to   { opacity: 1; transform: scale(1) translateY(0); }
 }
 
-.title-text-snake {
-  font-size: clamp(42px, 14vw, 64px);
-  font-weight: 900;
-  letter-spacing: 4px;
-  background: linear-gradient(180deg, #FFE066 0%, #FFA726 40%, #FF7043 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  text-shadow: none;
-  filter: drop-shadow(0 3px 8px rgba(255,152,0,0.5)) drop-shadow(0 0 20px rgba(255,183,77,0.3));
+/* ── 타이틀 텍스트 (다중 레이어 입체) ── */
+.title-text-wrap {
+  position: relative;
+  display: inline-block;
   line-height: 1;
 }
-
-.title-text-game {
-  font-size: clamp(32px, 10vw, 48px);
+.title-text-wrap > span {
   font-weight: 900;
-  letter-spacing: 6px;
-  background: linear-gradient(180deg, #66BB6A 0%, #43A047 40%, #2E7D32 100%);
+  letter-spacing: 4px;
+  display: block;
+}
+/* SNAKE 크기 */
+.title-text-wrap.snake > span { font-size: clamp(46px, 15vw, 70px); }
+/* GAME 크기 */
+.title-text-wrap.game { margin-top: -6px; }
+.title-text-wrap.game > span { font-size: clamp(36px, 11vw, 54px); letter-spacing: 6px; }
+
+/* 레이어 겹치기 */
+.title-text-wrap > span:not(:first-child) {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+}
+
+/* 1) 가장 아래: 진한 그림자 (3D 두께감) */
+.title-shadow {
+  color: transparent;
+  -webkit-text-stroke: 0;
+}
+.title-text-wrap.snake .title-shadow {
+  text-shadow:
+    0 6px 0 #8B4513,
+    0 7px 0 #6D3610,
+    0 8px 0 #5A2D0E,
+    0 9px 15px rgba(0,0,0,0.5),
+    0 12px 30px rgba(0,0,0,0.3);
+  color: #A0522D;
+}
+.title-text-wrap.game .title-shadow {
+  text-shadow:
+    0 6px 0 #1B5E20,
+    0 7px 0 #145218,
+    0 8px 0 #0E3D12,
+    0 9px 15px rgba(0,0,0,0.5),
+    0 12px 30px rgba(0,0,0,0.3);
+  color: #2E7D32;
+}
+
+/* 2) 두꺼운 외곽선 (stroke) */
+.title-outline { color: transparent; }
+.title-text-wrap.snake .title-outline {
+  -webkit-text-stroke: 5px #8B4513;
+  paint-order: stroke fill;
+}
+.title-text-wrap.game .title-outline {
+  -webkit-text-stroke: 5px #1B5E20;
+  paint-order: stroke fill;
+}
+
+/* 3) 메인 그라데이션 채우기 */
+.title-fill {
+  background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+  -webkit-text-stroke: 2px rgba(0,0,0,0.15);
+  paint-order: stroke fill;
+}
+.title-text-wrap.snake .title-fill {
+  background: linear-gradient(180deg, #FFF9C4 0%, #FFE082 15%, #FFB300 40%, #FF8F00 70%, #E65100 100%);
+  -webkit-background-clip: text;
   background-clip: text;
-  filter: drop-shadow(0 3px 8px rgba(76,175,80,0.5)) drop-shadow(0 0 20px rgba(76,175,80,0.3));
-  line-height: 1;
-  margin-top: -4px;
+}
+.title-text-wrap.game .title-fill {
+  background: linear-gradient(180deg, #C8E6C9 0%, #81C784 15%, #4CAF50 40%, #388E3C 70%, #1B5E20 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+/* 4) 상단 하이라이트 (빛 반사 느낌) */
+.title-highlight {
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background: linear-gradient(180deg, rgba(255,255,255,0.7) 0%, rgba(255,255,255,0.2) 30%, transparent 50%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  pointer-events: none;
 }
 
 /* ── 별/반짝이 장식 ── */
