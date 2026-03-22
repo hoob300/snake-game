@@ -58,8 +58,8 @@ let lastTickTime = 0, tickProgress = 0, rAFId = null;
 // inventory: 뱀이 먹은 아이템 대기열 (FIFO, 먹은 순서대로 사용)
 // frozenTimer: 적 동결 남은 틱 수 (0이면 비활성)
 // invincibleTimer: 뱀 무적 남은 틱 수 (0이면 비활성)
-// itemSpawnCounter: 아이템 스폰 간격 카운터 (틱)
-let fieldItems, inventory, frozenTimer, invincibleTimer, itemSpawnCounter;
+// lastItemLevel: 마지막으로 아이템이 스폰된 레벨 (3레벨마다 1개)
+let fieldItems, inventory, frozenTimer, invincibleTimer, lastItemLevel;
 
 // 아이템 종류 3가지 정의
 // freeze: ⏱️ 적 3초 동결, kill: 💀 랜덤 적 1마리 삭제, invincible: 🛡️ 5초 무적
@@ -115,7 +115,7 @@ function init() {
   inventory        = [];    // 인벤토리 비우기
   frozenTimer      = 0;     // 동결 해제
   invincibleTimer  = 0;     // 무적 해제
-  itemSpawnCounter = 0;     // 스폰 카운터 초기화
+  lastItemLevel    = 0;     // 아이템 스폰 레벨 초기화
   updateInventoryUI();      // 인벤토리 UI 업데이트
 
   // 화면 UI 초기화
@@ -176,17 +176,20 @@ function onBoss(p, ex) {
   return bossEnemies.some(b => b!==ex && bossOccupies(b).some(c=>c.x===p.x&&c.y===p.y));
 }
 
-// 일반 먹이를 뱀·몹·보스가 없는 빈 칸에 랜덤 배치
+// 해당 칸에 아이템이 있는지 확인
+function onItem(p) { return fieldItems.some(it => it.x === p.x && it.y === p.y); }
+
+// 일반 먹이를 뱀·몹·보스·아이템이 없는 빈 칸에 랜덤 배치
 function placeFood() {
   let p;
-  do { p = randomCell(); } while (onSnake(p) || onEnemy(p,null) || onBoss(p,null));
+  do { p = randomCell(); } while (onSnake(p) || onEnemy(p,null) || onBoss(p,null) || onItem(p));
   food = p;
 }
 // 보너스 먹이(별) 배치. 80틱 후 사라집니다.
 function placeBonusFood() {
   let p;
   do { p = randomCell(); }
-  while (onSnake(p) || onEnemy(p,null) || onBoss(p,null) || (p.x===food.x && p.y===food.y));
+  while (onSnake(p) || onEnemy(p,null) || onBoss(p,null) || onItem(p) || (p.x===food.x && p.y===food.y));
   bonusFood = { ...p, timer:80 };
 }
 
@@ -204,7 +207,7 @@ function enemyMoveEvery() {
 function spawnEnemy(type) {
   let p, att=0;
   do { p=randomCell(); att++; }
-  while (att<300 && (onSnake(p)||distToHead(p)<6||onEnemy(p,null)||onBoss(p,null)||(p.x===food.x&&p.y===food.y)));
+  while (att<300 && (onSnake(p)||distToHead(p)<6||onEnemy(p,null)||onBoss(p,null)||onItem(p)||(p.x===food.x&&p.y===food.y)));
   const dirs4=[{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}];
   const d=dirs4[Math.floor(Math.random()*4)];
   // ox, oy: 보간을 위한 이전 위치. mt: 이동 경과 카운터, mi: 이동 주기
@@ -560,14 +563,6 @@ function tick() {
   // 보너스 먹이 타이머 감소
   if (bonusFood) { bonusFood.timer--; if (bonusFood.timer<=0) bonusFood=null; }
 
-  // ── 아이템 스폰 (약 10초마다) ──
-  itemSpawnCounter++;
-  const spawnInterval = Math.round(10000 / speed); // 10초를 틱 수로 변환
-  if (itemSpawnCounter >= spawnInterval) {
-    itemSpawnCounter = 0;
-    spawnFieldItem(); // 맵에 아이템 하나 생성
-  }
-
   // ── 아이템 줍기 (뱀 머리가 아이템 위에 도착하면) ──
   const head2 = snake[0];
   fieldItems = fieldItems.filter(item => {
@@ -614,6 +609,14 @@ function updateLevel() {
     // 속도는 고정 (레벨이 올라도 speed 값 변경 없음)
     syncEnemies();               // 새 레벨에 맞는 몹/보스 소환
     addToast(`LEVEL ${level}`,'#facc15',1.5); // 레벨업 메시지 표시
+
+    // 3레벨마다 아이템 1개 스폰 (레벨 3, 6, 9, 12, ...)
+    const itemLevelGroup = Math.floor(level / 3); // 현재 속한 3레벨 구간
+    if (level >= 3 && itemLevelGroup > lastItemLevel) {
+      lastItemLevel = itemLevelGroup;
+      spawnFieldItem();
+      addToast('🎁 아이템 등장!', '#60A5FA', 1.3);
+    }
   }
 }
 
@@ -1346,12 +1349,12 @@ function drawFireballs() {
   });
 }
 
-// ── 일반 몹 그리기 ───────────────────────────────────────────
-// 각 몹 타입별 색상 정의
+// ── 일반 몹 그리기 (아기자기한 오크 스타일) ─────────────────
+// 각 몹 타입별 색상 정의 (오크 피부색 계열)
 const ENEMY_STYLE = {
-  wanderer:   { glow:'rgba(251,146,60,0.35)',  body:'#fb923c', dark:'#7c2d12' }, // 주황
-  chaser:     { glow:'rgba(239,68,68,0.45)',   body:'#ef4444', dark:'#7f1d1d' }, // 빨강
-  teleporter: { glow:'rgba(167,139,250,0.45)', body:'#a78bfa', dark:'#3b0764' }, // 보라
+  wanderer:   { skin:'#7CB342', skinDark:'#558B2F', glow:'rgba(124,179,66,0.35)', ear:'#689F38' },  // 초록 오크
+  chaser:     { skin:'#E53935', skinDark:'#B71C1C', glow:'rgba(229,57,53,0.4)',   ear:'#C62828' },  // 빨강 오크
+  teleporter: { skin:'#7E57C2', skinDark:'#4527A0', glow:'rgba(126,87,194,0.4)',  ear:'#5E35B1' },  // 보라 오크
 };
 function drawEnemies() { enemies.forEach(e=>drawEnemy(e)); }
 
@@ -1362,63 +1365,167 @@ function drawEnemy(e) {
   // 보간 위치 계산 (teleporter는 보간 없이 즉시 이동)
   const mi = e.mi || 4;
   const t  = e.type==='teleporter' ? 1 : Math.min(1, ((e.mt??mi) + tickProgress) / mi);
-  const rx = e.ox!=null ? e.ox+(e.x-e.ox)*t : e.x; // 보간 X
-  const ry = e.oy!=null ? e.oy+(e.y-e.oy)*t : e.y; // 보간 Y
+  const rx = e.ox!=null ? e.ox+(e.x-e.ox)*t : e.x;
+  const ry = e.oy!=null ? e.oy+(e.y-e.oy)*t : e.y;
   const x=rx*CELL, y=ry*CELL, cx=x+CELL/2, cy=y+CELL/2;
   const s=ENEMY_STYLE[e.type];
+  const R = CELL * 0.44; // 오크 몸통 반지름
 
-  // 글로우 + 본체 사각형
+  // 글로우 효과
   const grd=ctx.createRadialGradient(cx,cy,1,cx,cy,CELL*0.95);
   grd.addColorStop(0,s.glow); grd.addColorStop(1,'transparent');
   ctx.fillStyle=grd; ctx.fillRect(x-CELL*0.45,y-CELL*0.45,CELL*1.9,CELL*1.9);
-  ctx.fillStyle=s.body; roundRect(ctx,x+2,y+2,CELL-4,CELL-4,5); ctx.fill();
 
-  // 몹 타입별 얼굴 표현
-  if (e.type==='wanderer') {
-    // 방랑자: 눈 2개 + 물결 입
-    ctx.fillStyle=s.dark;
+  // ── 뾰족한 귀 2개 (머리 양옆 위쪽) ──
+  ctx.fillStyle = s.ear;
+  // 왼쪽 귀
+  ctx.beginPath();
+  ctx.moveTo(cx - R * 0.7, cy - R * 0.3);
+  ctx.lineTo(cx - R * 1.3, cy - R * 1.2);
+  ctx.lineTo(cx - R * 0.2, cy - R * 0.6);
+  ctx.closePath(); ctx.fill();
+  // 오른쪽 귀
+  ctx.beginPath();
+  ctx.moveTo(cx + R * 0.7, cy - R * 0.3);
+  ctx.lineTo(cx + R * 1.3, cy - R * 1.2);
+  ctx.lineTo(cx + R * 0.2, cy - R * 0.6);
+  ctx.closePath(); ctx.fill();
+  // 귀 안쪽 (연한 색)
+  ctx.fillStyle = 'rgba(255,200,180,0.35)';
+  ctx.beginPath();
+  ctx.moveTo(cx - R * 0.6, cy - R * 0.35);
+  ctx.lineTo(cx - R * 1.1, cy - R * 1.0);
+  ctx.lineTo(cx - R * 0.3, cy - R * 0.55);
+  ctx.closePath(); ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(cx + R * 0.6, cy - R * 0.35);
+  ctx.lineTo(cx + R * 1.1, cy - R * 1.0);
+  ctx.lineTo(cx + R * 0.3, cy - R * 0.55);
+  ctx.closePath(); ctx.fill();
+
+  // ── 둥근 머리 (오크 피부색 그라데이션) ──
+  const headGrd = ctx.createRadialGradient(cx - 2, cy - 2, 1, cx, cy, R);
+  headGrd.addColorStop(0, s.skin);       // 밝은 피부
+  headGrd.addColorStop(1, s.skinDark);   // 어두운 피부
+  ctx.fillStyle = headGrd;
+  ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
+
+  // 머리 테두리
+  ctx.strokeStyle = s.skinDark;
+  ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
+
+  // ── 타입별 얼굴 표현 ──
+  if (e.type === 'wanderer') {
+    // 방랑자 오크: 커다란 동그란 눈 + 아래 송곳니 + 멍청한 표정
+    // 큰 흰 눈
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(cx - 3.2, cy - 1.5, 3.2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + 3.2, cy - 1.5, 3.2, 0, Math.PI * 2); ctx.fill();
+    // 동공 (약간 위를 쳐다봄)
+    ctx.fillStyle = '#1a1a1a';
+    ctx.beginPath(); ctx.arc(cx - 3.2, cy - 2.2, 1.8, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + 3.2, cy - 2.2, 1.8, 0, Math.PI * 2); ctx.fill();
+    // 눈 반짝임
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(cx - 3.8, cy - 2.8, 0.8, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + 2.6, cy - 2.8, 0.8, 0, Math.PI * 2); ctx.fill();
+    // 넓적한 입 (열린 입)
+    ctx.fillStyle = '#4E342E';
     ctx.beginPath();
-    ctx.arc(cx-3,cy-1.5,2,0,Math.PI*2);
-    ctx.arc(cx+3,cy-1.5,2,0,Math.PI*2);
+    ctx.ellipse(cx, cy + 3.8, 3.5, 2.2, 0, 0, Math.PI);
     ctx.fill();
-    ctx.strokeStyle=s.dark; ctx.lineWidth=1.5;
+    // 아래에서 올라온 송곳니 2개 (오크 특징)
+    ctx.fillStyle = '#FFFDE7';
     ctx.beginPath();
-    ctx.moveTo(cx-4,cy+3.5);
-    ctx.quadraticCurveTo(cx-1.5,cy+5.5,cx,cy+3.5);
-    ctx.quadraticCurveTo(cx+1.5,cy+1.5,cx+4,cy+3.5);
-    ctx.stroke();
-  } else if (e.type==='chaser') {
-    // 추격자: 치켜 뜬 눈썹 + 이빨
-    ctx.strokeStyle=s.dark; ctx.lineWidth=2;
-    ctx.beginPath();
-    ctx.moveTo(cx-5,cy-4); ctx.lineTo(cx-2,cy-1.5); // 왼쪽 눈썹
-    ctx.moveTo(cx+5,cy-4); ctx.lineTo(cx+2,cy-1.5); // 오른쪽 눈썹
-    ctx.stroke();
-    ctx.fillStyle='#fff'; // 이빨 3개
-    for (let i=-1;i<=1;i++) ctx.fillRect(cx+i*3-1,cy+2.5,2.5,3.5);
-  } else {
-    // 순간이동자: 번개 모양 + 이동 준비 시 충전 링
-    ctx.fillStyle='#fff';
-    ctx.beginPath();
-    ctx.moveTo(cx+1,cy-6); ctx.lineTo(cx-2.5,cy+0.5);
-    ctx.lineTo(cx+1,cy+0.5); ctx.lineTo(cx-1,cy+6);
-    ctx.lineTo(cx+2.5,cy-0.5); ctx.lineTo(cx-1,cy-0.5);
+    ctx.moveTo(cx - 3, cy + 2.5); ctx.lineTo(cx - 2, cy + 0.5); ctx.lineTo(cx - 1, cy + 2.5);
     ctx.closePath(); ctx.fill();
-    if (e.teleTimer>5) {
-      // 이동 전 충전 게이지 링
-      ctx.strokeStyle='rgba(255,255,255,0.6)'; ctx.lineWidth=1.5;
+    ctx.beginPath();
+    ctx.moveTo(cx + 1, cy + 2.5); ctx.lineTo(cx + 2, cy + 0.5); ctx.lineTo(cx + 3, cy + 2.5);
+    ctx.closePath(); ctx.fill();
+
+  } else if (e.type === 'chaser') {
+    // 추격자 오크: 화난 눈썹 + 이글이글 눈 + 큰 송곳니
+    // 화난 눈
+    ctx.fillStyle = '#FFEB3B';
+    ctx.beginPath(); ctx.arc(cx - 3, cy - 1.5, 2.8, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + 3, cy - 1.5, 2.8, 0, Math.PI * 2); ctx.fill();
+    // 세로 슬릿 동공 (사나운 느낌)
+    ctx.fillStyle = '#B71C1C';
+    ctx.beginPath(); ctx.ellipse(cx - 3, cy - 1.5, 0.8, 2.2, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx + 3, cy - 1.5, 0.8, 2.2, 0, 0, Math.PI * 2); ctx.fill();
+    // 화난 눈썹 (V자)
+    ctx.strokeStyle = s.skinDark; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx - 5.5, cy - 4.5); ctx.lineTo(cx - 1.5, cy - 3);
+    ctx.moveTo(cx + 5.5, cy - 4.5); ctx.lineTo(cx + 1.5, cy - 3);
+    ctx.stroke();
+    // 으르렁 입 + 큰 이빨
+    ctx.fillStyle = '#3E2723';
+    ctx.beginPath();
+    ctx.moveTo(cx - 4, cy + 3); ctx.quadraticCurveTo(cx, cy + 6.5, cx + 4, cy + 3);
+    ctx.closePath(); ctx.fill();
+    // 이빨 3개 (위에서 아래로)
+    ctx.fillStyle = '#FFFDE7';
+    for (let i = -1; i <= 1; i++) {
       ctx.beginPath();
-      ctx.arc(cx,cy,CELL/2-1,-Math.PI/2,-Math.PI/2+Math.PI*2*(e.teleTimer/22));
+      ctx.moveTo(cx + i * 2.5 - 1, cy + 3);
+      ctx.lineTo(cx + i * 2.5, cy + 5);
+      ctx.lineTo(cx + i * 2.5 + 1, cy + 3);
+      ctx.closePath(); ctx.fill();
+    }
+    // 상처 자국 (왼쪽 뺨에 X표시)
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(cx - 6, cy); ctx.lineTo(cx - 4, cy + 2);
+    ctx.moveTo(cx - 4, cy); ctx.lineTo(cx - 6, cy + 2);
+    ctx.stroke();
+
+  } else {
+    // 순간이동자 오크: 마법사 모자 + 반짝이는 보라 눈 + 충전 링
+    // 마법 반짝이는 눈
+    const now = performance.now();
+    const sparkle = 0.6 + 0.4 * Math.sin(now / 200);
+    ctx.fillStyle = `rgba(206,147,255,${sparkle})`;
+    ctx.beginPath(); ctx.arc(cx - 3, cy - 1, 2.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + 3, cy - 1, 2.5, 0, Math.PI * 2); ctx.fill();
+    // 밝은 동공
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(cx - 3, cy - 1.5, 1.2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + 3, cy - 1.5, 1.2, 0, Math.PI * 2); ctx.fill();
+    // 입 (~모양으로 여유로운 미소)
+    ctx.strokeStyle = s.skinDark; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(cx - 3, cy + 3);
+    ctx.quadraticCurveTo(cx - 1.5, cy + 5, cx, cy + 3);
+    ctx.quadraticCurveTo(cx + 1.5, cy + 1, cx + 3, cy + 3);
+    ctx.stroke();
+    // 작은 별 장식 (머리 위에 반짝이는 별)
+    ctx.fillStyle = `rgba(255,235,59,${sparkle})`;
+    ctx.font = `${Math.round(CELL * 0.3)}px sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('✦', cx, cy - R - 3);
+
+    // 이동 전 충전 게이지 링
+    if (e.teleTimer > 5) {
+      ctx.strokeStyle = `rgba(206,147,255,${0.4 + sparkle * 0.3})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, R + 2, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (e.teleTimer / 22));
       ctx.stroke();
     }
   }
 
-  // 몹 타입 레이블 (방/추/순)
-  const labels={wanderer:'방',chaser:'추',teleporter:'순'};
-  ctx.fillStyle='rgba(0,0,0,0.55)'; roundRect(ctx,x+2,y-8,9,8,2); ctx.fill();
-  ctx.fillStyle='#fff'; ctx.font='bold 6px sans-serif';
-  ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText(labels[e.type],x+6,y-4);
+  // 몹 타입 레이블 배지 (방/추/순)
+  const labels = { wanderer: '방', chaser: '추', teleporter: '순' };
+  const badgeColor = { wanderer: '#558B2F', chaser: '#B71C1C', teleporter: '#4527A0' };
+  ctx.fillStyle = badgeColor[e.type];
+  roundRect(ctx, cx - 5, y - 9, 11, 9, 3); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 0.6;
+  roundRect(ctx, cx - 5, y - 9, 11, 9, 3); ctx.stroke();
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 6px sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(labels[e.type], cx + 0.5, y - 4.5);
 }
 
 // ── 보스 그리기 ──────────────────────────────────────────────
