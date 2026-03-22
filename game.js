@@ -897,12 +897,11 @@ function drawSnake() {
     return W;
   }
 
-  // ── 뱀 색상: 진한 초록 기반 ──
-  // 실제 뱀처럼 진한 에메랄드 그린 → 올리브 그린
-  const SNAKE_MAIN   = '#2D8B4E'; // 메인 몸통 초록
-  const SNAKE_DARK   = '#1A5C32'; // 어두운 테두리/비늘 색
-  const SNAKE_SCALE  = '#1E6B3A'; // 다이아몬드 무늬 색
+  // ── 뱀 색상: 얼룩덜룩한 자연 뱀 패턴 ──
+  const SNAKE_DARK   = '#1A5C32'; // 어두운 테두리
   const SNAKE_HEAD   = '#34A853'; // 머리 밝은 초록
+  // 얼룩 색상 배열 (어두운 올리브~갈색~검은색 반점)
+  const BLOTCH_COLORS = ['#2C5F2D', '#1B4332', '#3B3024', '#4A6741', '#254D32'];
 
   // ── 1단계: 그림자 ──
   ctx.save();
@@ -917,11 +916,14 @@ function drawSnake() {
   ctx.stroke();
   ctx.restore();
 
-  // ── 2단계: 메인 몸통 (균일 두께 초록 라인) ──
+  // ── 2단계: 메인 몸통 (세그먼트마다 약간 다른 색으로 얼룩 표현) ──
   for (let i = pts.length - 2; i >= 0; i--) {
     const a = pts[i + 1], b = pts[i];
     const w = (widthAt(i) + widthAt(i + 1)) / 2;
-    ctx.strokeStyle = SNAKE_MAIN;
+    // 마디마다 색상을 미세하게 변화시켜 얼룩덜룩한 느낌
+    const colorIdx = i % 3;
+    const baseColors = ['#3E8E41', '#367D39', '#469B49'];
+    ctx.strokeStyle = baseColors[colorIdx];
     ctx.lineWidth = w;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -931,14 +933,14 @@ function drawSnake() {
     ctx.stroke();
   }
 
-  // ── 3단계: 배(아랫면) 밝은 줄 (뱀의 복부 표현) ──
+  // ── 3단계: 배(복부) — 연한 노란빛 줄 ──
   ctx.save();
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   for (let i = pts.length - 2; i >= 0; i--) {
     const a = pts[i + 1], b = pts[i];
-    const w = widthAt(i) * 0.32;
-    ctx.strokeStyle = 'rgba(92,214,133,0.4)';
+    const w = widthAt(i) * 0.28;
+    ctx.strokeStyle = 'rgba(200,220,140,0.35)';
     ctx.lineWidth = w;
     ctx.beginPath();
     ctx.moveTo(a.x - 1, a.y - 1);
@@ -947,41 +949,59 @@ function drawSnake() {
   }
   ctx.restore();
 
-  // ── 4단계: 다이아몬드 비늘 무늬 ──
-  // 실제 뱀처럼 몸통을 따라 마름모(◆) 무늬를 그립니다
+  // ── 4단계: 불규칙 얼룩 반점 (뱀 특유의 패턴) ──
+  // 몸통을 따라 크기·위치가 불규칙한 어두운 반점을 그립니다
   for (let i = 1; i < pts.length - 1; i++) {
-    // 매 2마디마다 다이아몬드 패턴 (짝수 인덱스에만)
-    if (i % 2 !== 0) continue;
     const p = pts[i];
-    // 이동 방향 계산 (이전→다음 마디 방향)
-    const prev = pts[i - 1], next = pts[i + 1];
+    const prev = pts[i - 1], next = pts[Math.min(i + 1, pts.length - 1)];
     const dx = next.x - prev.x, dy = next.y - prev.y;
     const len = Math.sqrt(dx * dx + dy * dy) || 1;
-    const fwd = { x: dx / len, y: dy / len };     // 진행 방향 단위 벡터
-    const prp = { x: -fwd.y, y: fwd.x };          // 수직 방향 단위 벡터
-    const sz = widthAt(i) * 0.32; // 다이아몬드 크기
+    const fwd = { x: dx / len, y: dy / len };
+    const prp = { x: -fwd.y, y: fwd.x };
+    const hw = widthAt(i) * 0.38; // 반폭
 
-    // 마름모 4꼭짓점: 위(진행방향), 오른쪽, 아래, 왼쪽
-    ctx.fillStyle = SNAKE_SCALE;
-    ctx.globalAlpha = 0.55;
-    ctx.beginPath();
-    ctx.moveTo(p.x + fwd.x * sz,  p.y + fwd.y * sz);   // 위
-    ctx.lineTo(p.x + prp.x * sz * 0.7, p.y + prp.y * sz * 0.7); // 오른쪽
-    ctx.lineTo(p.x - fwd.x * sz,  p.y - fwd.y * sz);   // 아래
-    ctx.lineTo(p.x - prp.x * sz * 0.7, p.y - prp.y * sz * 0.7); // 왼쪽
-    ctx.closePath();
-    ctx.fill();
+    // 의사 랜덤 해시로 반점 패턴 결정 (매 프레임 동일)
+    const hash = (i * 7 + 3) % 11;
 
-    // 다이아몬드 안에 밝은 점 (비늘 반짝임)
-    ctx.fillStyle = '#A8E6C0';
-    ctx.globalAlpha = 0.35;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, sz * 0.2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = 1;
+    if (hash < 4) {
+      // 큰 얼룩 반점 (어두운 색 타원)
+      const bx = p.x + prp.x * (hash - 2) * 2;
+      const by = p.y + prp.y * (hash - 2) * 2;
+      const blobR = hw * (0.5 + (hash % 3) * 0.15);
+      ctx.fillStyle = BLOTCH_COLORS[hash % BLOTCH_COLORS.length];
+      ctx.globalAlpha = 0.6;
+      ctx.beginPath();
+      ctx.ellipse(bx, by, blobR, blobR * 0.7, Math.atan2(fwd.y, fwd.x), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    } else if (hash < 7) {
+      // 중간 크기 마름모 비늘
+      const sz = hw * 0.55;
+      ctx.fillStyle = BLOTCH_COLORS[(hash + 2) % BLOTCH_COLORS.length];
+      ctx.globalAlpha = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(p.x + fwd.x * sz, p.y + fwd.y * sz);
+      ctx.lineTo(p.x + prp.x * sz * 0.6, p.y + prp.y * sz * 0.6);
+      ctx.lineTo(p.x - fwd.x * sz, p.y - fwd.y * sz);
+      ctx.lineTo(p.x - prp.x * sz * 0.6, p.y - prp.y * sz * 0.6);
+      ctx.closePath();
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+
+    // 작은 점 반점 (모든 마디에 랜덤 위치)
+    if (hash % 2 === 0) {
+      const dotOff = (hash % 4 - 1.5) * 3;
+      ctx.fillStyle = '#1B4332';
+      ctx.globalAlpha = 0.4;
+      ctx.beginPath();
+      ctx.arc(p.x + prp.x * dotOff, p.y + prp.y * dotOff, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
   }
 
-  // ── 5단계: 가장자리 어두운 테두리 (양쪽 경계선) ──
+  // ── 5단계: 가장자리 어두운 테두리 + 비늘 질감 ──
   for (let i = pts.length - 2; i >= 0; i--) {
     const a = pts[i + 1], b = pts[i];
     const w = (widthAt(i) + widthAt(i + 1)) / 2;
@@ -989,25 +1009,23 @@ function drawSnake() {
     const len = Math.sqrt(dx * dx + dy * dy) || 1;
     const nx = -dy / len, ny = dx / len;
 
-    ctx.strokeStyle = 'rgba(26,92,50,0.45)';
-    ctx.lineWidth = 1.8;
+    // 양쪽 가장자리 (얼룩처럼 불규칙한 두께)
+    ctx.strokeStyle = 'rgba(26,67,50,0.5)';
+    ctx.lineWidth = 1.5 + (i % 3) * 0.3;
     ctx.lineCap = 'round';
-    // 위쪽 가장자리
     ctx.beginPath();
     ctx.moveTo(a.x + nx * w * 0.46, a.y + ny * w * 0.46);
     ctx.lineTo(b.x + nx * w * 0.46, b.y + ny * w * 0.46);
     ctx.stroke();
-    // 아래쪽 가장자리
     ctx.beginPath();
     ctx.moveTo(a.x - nx * w * 0.46, a.y - ny * w * 0.46);
     ctx.lineTo(b.x - nx * w * 0.46, b.y - ny * w * 0.46);
     ctx.stroke();
   }
 
-  // ── 6단계: 옆면 비늘 줄무늬 (뱀 옆구리 표현) ──
-  // 몸통 양쪽 가장자리를 따라 짧은 수직 줄을 그려 비늘 질감을 표현합니다
+  // ── 6단계: 옆면 갈라진 비늘 줄무늬 ──
   for (let i = 1; i < pts.length - 1; i++) {
-    if (i % 3 !== 0) continue; // 3마디마다
+    if (i % 2 !== 0) continue; // 2마디마다
     const p = pts[i];
     const prev = pts[i - 1], next = pts[Math.min(i + 1, pts.length - 1)];
     const dx = next.x - prev.x, dy = next.y - prev.y;
@@ -1015,16 +1033,15 @@ function drawSnake() {
     const prp = { x: dy / len, y: -dx / len };
     const w = widthAt(i) * 0.46;
 
-    ctx.strokeStyle = 'rgba(26,92,50,0.25)';
-    ctx.lineWidth = 1;
-    // 왼쪽 비늘 줄
+    ctx.strokeStyle = 'rgba(27,67,50,0.3)';
+    ctx.lineWidth = 0.8;
+    // 양쪽 비늘 줄
     ctx.beginPath();
-    ctx.moveTo(p.x + prp.x * w * 0.6, p.y + prp.y * w * 0.6);
+    ctx.moveTo(p.x + prp.x * w * 0.5, p.y + prp.y * w * 0.5);
     ctx.lineTo(p.x + prp.x * w, p.y + prp.y * w);
     ctx.stroke();
-    // 오른쪽 비늘 줄
     ctx.beginPath();
-    ctx.moveTo(p.x - prp.x * w * 0.6, p.y - prp.y * w * 0.6);
+    ctx.moveTo(p.x - prp.x * w * 0.5, p.y - prp.y * w * 0.5);
     ctx.lineTo(p.x - prp.x * w, p.y - prp.y * w);
     ctx.stroke();
   }
