@@ -2276,7 +2276,7 @@ async function getRankings() {
     .from('rankings')
     .select('name, score, created_at')
     .order('score', { ascending: false })
-    .limit(10);
+    .limit(3);
   if (error) { console.error('랭킹 조회 오류:', error.message); return []; }
   return data.map(r => ({
     name: r.name,
@@ -2302,16 +2302,26 @@ async function renderRankings() {
     rankingList.innerHTML='<p class="rank-empty">아직 기록이 없습니다 🐍</p>';
     return;
   }
-  const medals=['🥇','🥈','🥉']; // 1~3위 메달
-  rankingList.innerHTML = r.map((item,i)=>`
-    <div class="rank-item rank-${i<3?i+1:''}">
-      <div class="rank-badge ${i<3?'':'num'}">${i<3?medals[i]:`${i+1}위`}</div>
-      <div class="rank-info">
-        <div class="rank-name">${escHtml(item.name)}</div>
-        <div class="rank-date">${item.date||''}</div>
+  const medals=['🥇','🥈','🥉'];
+  // 포디움 순서: 2등(왼), 1등(가운데), 3등(오른)
+  const order = [1, 0, 2]; // 인덱스 순서
+  const slots = order.map(idx => {
+    const item = r[idx];
+    if (!item) return `<div class="podium-slot">
+      <div class="podium-card"><div class="podium-empty">-</div></div>
+      <div class="podium-bar"></div>
+    </div>`;
+    return `<div class="podium-slot">
+      <div class="podium-card">
+        <div class="podium-medal">${medals[idx]}</div>
+        <div class="podium-name">${escHtml(item.name)}</div>
+        <div class="podium-score">${item.score.toLocaleString()}</div>
+        <div class="podium-date">${item.date||''}</div>
       </div>
-      <div class="rank-score">${item.score.toLocaleString()}</div>
-    </div>`).join('');
+      <div class="podium-bar">${idx+1}</div>
+    </div>`;
+  }).join('');
+  rankingList.innerHTML = `<div class="podium">${slots}</div>`;
 }
 
 // HTML 특수문자를 안전하게 변환합니다. (XSS 방지)
