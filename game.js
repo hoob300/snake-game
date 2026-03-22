@@ -1188,76 +1188,169 @@ function bodyColorLight(i, len) {
 // ── 먹이 그리기 (빨간 사과 모양 + 초록 잎사귀) ──────────────
 function drawFood() {
   const x=food.x*CELL, y=food.y*CELL;
-  const cx=x+CELL/2, cy=y+CELL/2;
+  const cx=x+CELL/2;
   const R=CELL*0.42; // 사과 반지름
+
+  // 바운스 애니메이션 (위아래로 통통 튀는 효과)
+  const t = performance.now() / 1000; // 초 단위 시간
+  const bounce = Math.abs(Math.sin(t * 3)) * 4; // 0~4px 위아래 바운스
+  const cy = y + CELL/2 - 2 - bounce; // 기본 위치에서 위로 띄움 + 바운스
+
+  // 그림자 (바닥에 고정, 바운스 높이에 따라 크기 변화)
+  const shadowScale = 1 - bounce / 12; // 높이 올라갈수록 그림자 작아짐
+  ctx.fillStyle = 'rgba(0,0,0,0.2)';
+  ctx.beginPath();
+  ctx.ellipse(x + CELL/2, y + CELL - 2, CELL * 0.3 * shadowScale, 2.5 * shadowScale, 0, 0, Math.PI * 2);
+  ctx.fill();
 
   // 은은한 빨간 빛 (글로우)
   const grd=ctx.createRadialGradient(cx,cy,1,cx,cy,CELL*0.8);
   grd.addColorStop(0,'rgba(248,113,113,0.4)'); grd.addColorStop(1,'transparent');
-  ctx.fillStyle=grd; ctx.fillRect(x-CELL*0.3,y-CELL*0.3,CELL*1.6,CELL*1.6);
+  ctx.fillStyle=grd; ctx.fillRect(x-CELL*0.3,cy-CELL*0.5,CELL*1.6,CELL*1.6);
 
-  // 사과 본체 (빨간 원형, 위가 살짝 오목한 느낌)
-  const appleGrd=ctx.createRadialGradient(cx-2,cy-2,1,cx,cy,R);
-  appleGrd.addColorStop(0,'#FF6B6B'); // 밝은 빨강 (하이라이트)
+  // 사과 본체 (3D 입체 — 여러 겹 그라데이션)
+  // 아래쪽 어두운 반원 (그림자 면)
+  ctx.fillStyle = '#7F1D1D';
+  ctx.beginPath(); ctx.arc(cx, cy + 2, R, 0, Math.PI * 2); ctx.fill();
+
+  // 메인 사과 (밝은 빨강 그라데이션)
+  const appleGrd=ctx.createRadialGradient(cx - 3, cy - 3, 1, cx, cy, R);
+  appleGrd.addColorStop(0,'#FF8A8A'); // 아주 밝은 빨강 (하이라이트)
+  appleGrd.addColorStop(0.3,'#FF6B6B'); // 밝은 빨강
   appleGrd.addColorStop(0.7,'#DC2626'); // 진한 빨강
-  appleGrd.addColorStop(1,'#991B1B'); // 아주 진한 빨강 (그림자)
+  appleGrd.addColorStop(1,'#991B1B'); // 가장 어두운 테두리
   ctx.fillStyle=appleGrd;
-  ctx.beginPath(); ctx.arc(cx,cy+1,R,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
 
-  // 사과 하이라이트 (왼쪽 위 빛 반사)
-  ctx.fillStyle='rgba(255,255,255,0.35)';
-  ctx.beginPath(); ctx.ellipse(cx-2,cy-2,R*0.3,R*0.2,-0.5,0,Math.PI*2); ctx.fill();
+  // 사과 테두리 (입체감 강조)
+  ctx.strokeStyle = 'rgba(127,29,29,0.5)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
 
-  // 꼭지 (갈색 작은 줄기)
-  ctx.strokeStyle='#78350F'; // 갈색
-  ctx.lineWidth=1.5;
+  // 큰 하이라이트 (왼쪽 위 빛 반사 — 유리 같은 광택)
+  ctx.fillStyle='rgba(255,255,255,0.45)';
+  ctx.beginPath(); ctx.ellipse(cx - 2, cy - 3, R * 0.35, R * 0.22, -0.5, 0, Math.PI * 2); ctx.fill();
+
+  // 작은 반짝임 점
+  ctx.fillStyle='rgba(255,255,255,0.7)';
+  ctx.beginPath(); ctx.arc(cx - 3, cy - 4, 1.2, 0, Math.PI * 2); ctx.fill();
+
+  // 꼭지 (갈색 줄기 — 더 두껍고 자연스럽게)
+  ctx.strokeStyle='#78350F';
+  ctx.lineWidth=2;
+  ctx.lineCap='round';
   ctx.beginPath();
   ctx.moveTo(cx, cy - R + 1);
-  ctx.lineTo(cx + 1, cy - R - 3); // 위로 살짝 비스듬히
+  ctx.quadraticCurveTo(cx + 1, cy - R - 2, cx + 2, cy - R - 4);
   ctx.stroke();
 
-  // 초록 잎사귀 (꼭지 옆에 작은 타원)
-  ctx.fillStyle='#22C55E'; // 초록색
+  // 초록 잎사귀 (더 크고 입체적)
+  ctx.fillStyle='#22C55E';
   ctx.beginPath();
-  ctx.ellipse(cx + 3, cy - R - 1, 3, 1.5, 0.4, 0, Math.PI * 2);
+  ctx.ellipse(cx + 4, cy - R - 2, 4, 2, 0.3, 0, Math.PI * 2);
+  ctx.fill();
+  // 잎사귀 밝은 면
+  ctx.fillStyle='rgba(134,239,172,0.6)';
+  ctx.beginPath();
+  ctx.ellipse(cx + 3.5, cy - R - 2.5, 2.5, 1, 0.3, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 사과 아래쪽 반사광 (바닥 반사)
+  ctx.fillStyle='rgba(255,200,200,0.15)';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + R * 0.6, R * 0.5, R * 0.15, 0, 0, Math.PI * 2);
   ctx.fill();
 }
 
 // 보너스 먹이(황금 별): 타이머가 20 이하로 남으면 깜빡입니다.
 function drawBonusFood() {
   const x=bonusFood.x*CELL, y=bonusFood.y*CELL;
-  const cx=x+CELL/2, cy=y+CELL/2;
+  const baseCx=x+CELL/2;
   // 3틱마다 교대로 보였다 사라졌다 (깜빡임)
   if (bonusFood.timer<20&&Math.floor(bonusFood.timer/3)%2!==0) return;
+
+  // 바운스 애니메이션 (사과와 다른 주기로 통통 튀기)
+  const t = performance.now() / 1000;
+  const bounce = Math.abs(Math.sin(t * 3.5 + 1)) * 5; // 0~5px 바운스 (별은 좀 더 높이)
+  const cx = baseCx;
+  const cy = y + CELL/2 - 3 - bounce; // 기본 위치에서 위로 띄움 + 바운스
+
+  // 그림자 (바닥에 고정)
+  const shadowScale = 1 - bounce / 15;
+  ctx.fillStyle = 'rgba(0,0,0,0.2)';
+  ctx.beginPath();
+  ctx.ellipse(baseCx, y + CELL - 2, CELL * 0.28 * shadowScale, 2 * shadowScale, 0, 0, Math.PI * 2);
+  ctx.fill();
 
   // 황금빛 글로우 (주변에 퍼지는 빛)
   const grd=ctx.createRadialGradient(cx,cy,1,cx,cy,CELL);
   grd.addColorStop(0,'rgba(250,204,21,0.55)'); grd.addColorStop(1,'transparent');
-  ctx.fillStyle=grd; ctx.fillRect(x-CELL*0.3,y-CELL*0.3,CELL*1.6,CELL*1.6);
+  ctx.fillStyle=grd; ctx.fillRect(x-CELL*0.3,cy-CELL*0.5,CELL*1.6,CELL*1.6);
 
   // 황금 별 모양 그리기 (5각 별)
   const R=CELL*0.42;    // 바깥 꼭짓점 반지름
   const r=CELL*0.18;    // 안쪽 꼭짓점 반지름
-  const starGrd=ctx.createRadialGradient(cx-1,cy-1,1,cx,cy,R);
-  starGrd.addColorStop(0,'#FDE68A'); // 밝은 금색
-  starGrd.addColorStop(1,'#F59E0B'); // 진한 금색
+
+  // 별 그림자 (약간 아래 + 어둡게)
+  ctx.fillStyle = 'rgba(180,120,0,0.3)';
+  ctx.beginPath();
+  for (let i=0; i<10; i++) {
+    const angle = -Math.PI/2 + (i * Math.PI / 5);
+    const radius = i % 2 === 0 ? R : r;
+    const sx = cx + Math.cos(angle) * radius;
+    const sy = cy + 2 + Math.sin(angle) * radius;
+    if (i === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
+  }
+  ctx.closePath(); ctx.fill();
+
+  // 별 본체 (입체 그라데이션)
+  const starGrd=ctx.createRadialGradient(cx - 2, cy - 2, 1, cx, cy, R);
+  starGrd.addColorStop(0,'#FEF3C7'); // 아주 밝은 금색 (하이라이트)
+  starGrd.addColorStop(0.3,'#FDE68A'); // 밝은 금색
+  starGrd.addColorStop(0.7,'#F59E0B'); // 진한 금색
+  starGrd.addColorStop(1,'#D97706'); // 가장 어두운 금색
   ctx.fillStyle=starGrd;
   ctx.beginPath();
   for (let i=0; i<10; i++) {
-    // 바깥 꼭짓점(짝수)과 안쪽 꼭짓점(홀수)를 번갈아 연결
     const angle = -Math.PI/2 + (i * Math.PI / 5);
     const radius = i % 2 === 0 ? R : r;
     const sx = cx + Math.cos(angle) * radius;
     const sy = cy + Math.sin(angle) * radius;
-    if (i === 0) ctx.moveTo(sx, sy);
-    else ctx.lineTo(sx, sy);
+    if (i === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
   }
-  ctx.closePath();
-  ctx.fill();
+  ctx.closePath(); ctx.fill();
 
-  // 별 하이라이트 (반짝임)
-  ctx.fillStyle='rgba(255,255,255,0.4)';
-  ctx.beginPath(); ctx.ellipse(cx-1,cy-2,R*0.25,R*0.15,-0.4,0,Math.PI*2); ctx.fill();
+  // 별 테두리
+  ctx.strokeStyle = 'rgba(180,100,0,0.4)';
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  for (let i=0; i<10; i++) {
+    const angle = -Math.PI/2 + (i * Math.PI / 5);
+    const radius = i % 2 === 0 ? R : r;
+    const sx = cx + Math.cos(angle) * radius;
+    const sy = cy + Math.sin(angle) * radius;
+    if (i === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
+  }
+  ctx.closePath(); ctx.stroke();
+
+  // 큰 하이라이트 (유리 광택)
+  ctx.fillStyle='rgba(255,255,255,0.5)';
+  ctx.beginPath(); ctx.ellipse(cx - 1, cy - 3, R * 0.28, R * 0.18, -0.4, 0, Math.PI * 2); ctx.fill();
+
+  // 반짝임 점
+  ctx.fillStyle='rgba(255,255,255,0.8)';
+  ctx.beginPath(); ctx.arc(cx - 2, cy - 4, 1.3, 0, Math.PI * 2); ctx.fill();
+
+  // 회전하는 작은 빛 파티클 (별 주위를 도는 반짝임)
+  const sparkAngle = t * 4;
+  const sparkDist = R + 4;
+  ctx.fillStyle='rgba(255,255,200,0.7)';
+  ctx.beginPath();
+  ctx.arc(cx + Math.cos(sparkAngle) * sparkDist, cy + Math.sin(sparkAngle) * sparkDist, 1.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(cx + Math.cos(sparkAngle + Math.PI) * sparkDist * 0.8, cy + Math.sin(sparkAngle + Math.PI) * sparkDist * 0.8, 1, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 // ── 이펙트 그리기 ───────────────────────────────────────────
